@@ -1,0 +1,21 @@
+# Render "Blueprint" — lets you deploy with one click via
+# https://dashboard.render.com/blueprints instead of clicking through the
+# manual "New Web Service" wizard. Uses the same Dockerfile as the Fly.io
+# setup, so both platforms stay in sync from one build definition.
+#
+# Free plan has NO persistent disk: any local file (including the room-state
+# JSON files under ROOM_DATA_DIR) is lost whenever the service restarts —
+# both on a redeploy and when it spins back up after ~15 min of inactivity.
+# That's a deliberate tradeoff for guaranteed $0 cost; see README.md.
+
+services:
+  - type: web
+    name: canos-incognita
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ROOM_DATA_DIR
+        value: /app/server/data/rooms

@@ -105,17 +105,35 @@ da der Server den gebauten Client selbst mit ausliefert (gleicher Origin).
 Auf dem Handy: Client-URL im Browser öffnen, Raum erstellen/beitreten, Karte per Ziehen
 verschieben und per Zwei-Finger-Pinch zoomen.
 
-## Deployment auf Fly.io
+## Deployment auf Render.com (empfohlen: kein Kostenrisiko)
 
 Der Server liefert im Produktionsbuild den gebauten Client gleich mit aus (siehe
-`server/src/index.ts`), es läuft also nur **ein** Dienst. Das `Dockerfile` und die
-`fly.toml` im Repo-Root sind dafür vorbereitet; der Raum-Zustand wird über die Env-Variable
-`ROOM_DATA_DIR` auf ein persistentes Volume geschrieben, damit Langzeitspiele einen
-Neustart/Redeploy überleben.
+`server/src/index.ts`), es läuft also nur **ein** Dienst — dasselbe `Dockerfile` wie unten
+bei Fly.io. Render's kostenloser "Free"-Plan verlangt keine Kreditkarte und kann nicht
+versehentlich Kosten verursachen.
 
-Einmalig (mit der [flyctl-CLI](https://fly.io/docs/flyctl/install/), von einer Maschine mit
-Netzwerkzugriff auf fly.io — dieses Entwicklungs-Sandbox-Environment hat `fly.io` per
-Netzwerk-Policy blockiert und kann den Deploy nicht selbst ausführen):
+**Wichtiger Kompromiss**: Der Free-Plan hat **keinen persistenten Datenträger**. Jeder
+Neustart — egal ob durch ein Redeploy oder durch das automatische Einschlafen nach ~15
+Minuten Inaktivität — verwirft alle laufenden Räume. Für ein gelegentliches Spiel mit
+Freunden in einer Sitzung ist das meist kein Problem; für ein tagelanges Langzeitspiel würde
+man später einen bezahlten Plan mit Disk brauchen (oder Fly.io, siehe unten).
+
+Einrichtung über das Dashboard (kein `render.yaml`-Blueprint-Import nötig, geht aber auch
+darüber, falls verfügbar):
+
+1. Auf [dashboard.render.com](https://dashboard.render.com) mit GitHub anmelden.
+2. **New +** → **Web Service** → dieses Repo (`simsek-aw/DSVC`) auswählen.
+3. Render erkennt automatisch das `Dockerfile` im Root. Als **Instance Type** "Free" wählen.
+4. Deploy klicken — fertig. Bei jedem Push auf den Branch redeployt Render automatisch.
+
+Diese Session hat keinen Netzwerkzugriff auf render.com (Policy blockiert `403`), der
+eigentliche Klick-Deploy muss also von dir im Browser erfolgen.
+
+## Alternative: Fly.io (mit echter Persistenz, aber Kreditkarte nötig)
+
+Falls die Langzeit-Persistenz später doch wichtiger wird als das Kostenrisiko: `fly.toml`
+liegt ebenfalls im Repo und ist mit einem gemounteten Volume vorbereitet, damit Raum-Daten
+(`ROOM_DATA_DIR`) einen Neustart überleben.
 
 ```bash
 fly auth login
@@ -124,7 +142,7 @@ fly volumes create canos_data --region fra --size 1
 fly deploy
 ```
 
-Danach für jedes weitere Update einfach erneut `fly deploy` ausführen. `fly.toml` ist so
-konfiguriert, dass die Maschine bei Inaktivität automatisch stoppt (spart Kosten) und bei
-neuen Verbindungen automatisch wieder hochfährt — laufende WebSocket-Verbindungen verhindern
-das Stoppen währenddessen.
+`fly.toml` stoppt die Maschine bei Inaktivität automatisch (spart Kosten) und startet sie
+bei neuen Verbindungen wieder — laufende WebSocket-Verbindungen verhindern das Stoppen
+währenddessen. Trotzdem gilt: Fly.io verlangt eine Kreditkarte und kann bei Verbrauch
+oberhalb des Freikontingents abrechnen.

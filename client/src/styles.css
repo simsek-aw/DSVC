@@ -650,19 +650,22 @@ body {
 }
 
 .bottom-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 
 .bottom-actions button {
   width: 100%;
-  padding: 9px;
+  /* Roomy enough to hit reliably on a phone even at three across. */
+  min-height: 46px;
+  padding: 8px 4px;
   border-radius: 10px;
   border: 1px solid #2a4a4f;
   background: #142c30;
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.78rem;
+  line-height: 1.15;
   cursor: pointer;
 }
 

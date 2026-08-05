@@ -249,6 +249,20 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           ))}
         </div>
 
+        {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && (
+          <div className="bottom-actions">
+            <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
+              🃏 Karten ({me?.developmentCards.length ?? 0})
+            </button>
+            <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
+              🔁 Handel
+            </button>
+            <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
+              Zug beenden
+            </button>
+          </div>
+        )}
+
         {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && !confirmingBuyCard && (
           <div className="build-bar">
             <BuildTile
@@ -329,7 +343,27 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {request && iAmRequester && (
+        {/* An arriving offer takes over this slot, so the "waiting for offers"
+            line is replaced right where the player is already looking rather
+            than the answer showing up somewhere further down. */}
+        {incomingTrade && (
+          <div className="trade-offer-banner">
+            <p>
+              {state.players.find((p) => p.id === incomingTrade.fromPlayerId)?.name} bietet dir:{" "}
+              {describeResources(incomingTrade.give)} gegen {describeResources(incomingTrade.receive)}
+            </p>
+            <div className="inline-picker">
+              <button className="primary-button small" onClick={() => sendAction({ type: "respondTrade", accept: true })}>
+                Annehmen
+              </button>
+              <button className="small" onClick={() => sendAction({ type: "respondTrade", accept: false })}>
+                Ablehnen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {request && iAmRequester && !incomingTrade && (
           <div className="request-banner own">
             <span>
               Du suchst {RESOURCE_ICONS[request.resource]} {RESOURCE_LABELS[request.resource].split(" ")[1]} — warte auf Angebote …
@@ -477,23 +511,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {incomingTrade && (
-          <div className="trade-offer-banner">
-            <p>
-              {state.players.find((p) => p.id === incomingTrade.fromPlayerId)?.name} bietet dir:{" "}
-              {describeResources(incomingTrade.give)} gegen {describeResources(incomingTrade.receive)}
-            </p>
-            <div className="inline-picker">
-              <button className="primary-button small" onClick={() => sendAction({ type: "respondTrade", accept: true })}>
-                Annehmen
-              </button>
-              <button className="small" onClick={() => sendAction({ type: "respondTrade", accept: false })}>
-                Ablehnen
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="log-panel">
           <button className="log-header" onClick={() => setLogExpanded((v) => !v)}>
             <span className="log-latest">{latestLogEntry}</span>
@@ -513,19 +530,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           )}
         </div>
 
-        {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && (
-          <div className="bottom-actions">
-            <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
-              🃏 Karten ({me?.developmentCards.length ?? 0})
-            </button>
-            <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
-              🔁 Handel
-            </button>
-            <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
-              Zug beenden
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

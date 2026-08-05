@@ -482,9 +482,55 @@ body {
   gap: 2px;
 }
 
+.resource-chip.requested {
+  outline: 2px solid #f4a261;
+}
+
 .resource-icon {
   font-size: 1.3rem;
   line-height: 1;
+}
+
+.request-banner {
+  background: #2a1d3f;
+  border: 1px solid #8338ec;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.request-banner.own {
+  background: #1d3a3f;
+  border-color: #2a9d8f;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.request-options {
+  display: flex;
+  gap: 6px;
+}
+
+.request-options button {
+  flex: 1;
+  font-size: 1.2rem;
+  padding: 6px 0;
+  border-radius: 8px;
+  border: 1px solid #2a4a4f;
+  background: #142c30;
+  cursor: pointer;
+}
+
+.request-banner .small {
+  border-radius: 8px;
+  border: 1px solid #2a4a4f;
+  background: #142c30;
+  color: #fff;
+  cursor: pointer;
 }
 
 .resource-count {

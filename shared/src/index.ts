@@ -28,6 +28,7 @@ export type {
   GamePhase,
   DiceRoll,
   TradeOffer,
+  ResourceRequest,
   GameState,
   ClientAction,
 } from "./types";

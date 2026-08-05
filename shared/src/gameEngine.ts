@@ -17,6 +17,7 @@ import {
   ResourceType,
   RESOURCE_TYPES,
   Road,
+  TERRAIN_NAMES_DE,
   Tile,
   VICTORY_POINTS_TO_WIN,
 } from "./types";
@@ -73,6 +74,7 @@ export function createLobby(roomId: string): GameState {
     longestRoadPlayerId: null,
     largestArmyPlayerId: null,
     pendingTrade: null,
+    resourceRequest: null,
     winnerId: null,
     log: [],
   };
@@ -196,8 +198,8 @@ function produceResources(state: GameState, total: number): GameState {
       const baseAmount = b.type === "city" ? 2 : 1;
       const finalAmount = tile.hasBoostToken ? baseAmount * 2 : baseAmount;
       const recipientId = isBribed && next.briberyBeneficiaryId ? next.briberyBeneficiaryId : b.ownerId;
-      if (isBribed) next = { ...next, log: [...next.log, `Bestochener Räuber leitet die Ernte auf einem ${resource}-Feld um!`] };
-      if (tile.hasBoostToken) next = { ...next, log: [...next.log, `Boost-Figur verdoppelt die Ernte auf einem ${resource}-Feld!`] };
+      if (isBribed) next = { ...next, log: [...next.log, `Bestochener Räuber leitet die Ernte auf einem ${TERRAIN_NAMES_DE[resource]}-Feld um!`] };
+      if (tile.hasBoostToken) next = { ...next, log: [...next.log, `Boost-Figur verdoppelt die Ernte auf einem ${TERRAIN_NAMES_DE[resource]}-Feld!`] };
       next = updatePlayer(next, recipientId, (p) => ({
         ...p,
         resources: { ...p.resources, [resource]: p.resources[resource] + finalAmount },
@@ -442,7 +444,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         tiles: state.tiles.map((t) => ({ ...t, hasClassicRobber: axialKey(t.coord) === axialKey(target.coord) })),
         robberTileCoord: target.coord,
       };
-      next = { ...next, log: [...next.log, `Räuber wandert auf ein ${target.terrain}-Feld.`] };
+      next = { ...next, log: [...next.log, `Räuber wandert auf ein ${TERRAIN_NAMES_DE[target.terrain]}-Feld.`] };
       return next;
     }
 
@@ -593,7 +595,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         next = updatePlayer(next, other.id, (p) => ({ ...p, resources: { ...p.resources, [action.resource]: 0 } }));
       }
       next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [action.resource]: p.resources[action.resource] + total } }));
-      next = { ...next, log: [...next.log, `${currentPlayer(next).name} verhängt ein Monopol auf ${action.resource} und kassiert ${total}.`] };
+      next = { ...next, log: [...next.log, `${currentPlayer(next).name} verhängt ein Monopol auf ${TERRAIN_NAMES_DE[action.resource]} und kassiert ${total}.`] };
       return next;
     }
 
@@ -607,7 +609,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         ...next,
         briberyTileCoord: target.coord,
         briberyBeneficiaryId: playerId,
-        log: [...next.log, `${currentPlayer(next).name} bestechen den Räuber — die Ernte eines ${target.terrain}-Felds wandert nun zu ihm.`],
+        log: [...next.log, `${currentPlayer(next).name} bestechen den Räuber — die Ernte eines ${TERRAIN_NAMES_DE[target.terrain]}-Felds wandert nun zu ihm.`],
       };
       return next;
     }
@@ -618,7 +620,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       if (action.give === action.receive) throw new GameError("Rohstoffe müssen unterschiedlich sein.");
       const player = currentPlayer(state);
       const ratio = bestBankRatio(state, playerId, action.give);
-      if (player.resources[action.give] < ratio) throw new GameError(`Du brauchst ${ratio}x ${action.give} für diesen Handel.`);
+      if (player.resources[action.give] < ratio) throw new GameError(`Du brauchst ${ratio}x ${TERRAIN_NAMES_DE[action.give]} für diesen Handel.`);
       let next = updatePlayer(state, playerId, (p) => ({
         ...p,
         resources: {
@@ -627,7 +629,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
           [action.receive]: p.resources[action.receive] + 1,
         },
       }));
-      next = { ...next, log: [...next.log, `${player.name} handelt ${ratio}x ${action.give} gegen 1x ${action.receive} mit der Bank.`] };
+      next = { ...next, log: [...next.log, `${player.name} handelt ${ratio}x ${TERRAIN_NAMES_DE[action.give]} gegen 1x ${TERRAIN_NAMES_DE[action.receive]} mit der Bank.`] };
       return next;
     }
 
@@ -668,8 +670,58 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         for (const r of RESOURCE_TYPES) resources[r] += trade.give[r] ?? 0;
         return { ...p, resources };
       });
-      next = { ...next, pendingTrade: null, log: [...next.log, `${proposer.name} und ${responder.name} handeln erfolgreich.`] };
+      next = {
+        ...next,
+        pendingTrade: null,
+        // A fulfilled trade also settles whatever "I need X" call started it.
+        resourceRequest: next.resourceRequest?.fromPlayerId === trade.toPlayerId ? null : next.resourceRequest,
+        log: [...next.log, `${proposer.name} und ${responder.name} handeln erfolgreich.`],
+      };
       return next;
+    }
+
+    case "requestResource": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      const asker = state.players.find((p) => p.id === playerId);
+      if (!asker) throw new GameError("Spieler nicht gefunden.");
+      // Deliberately NOT limited to the active player: the whole point of the
+      // shout-out is that anyone can flag what they need while waiting.
+      return {
+        ...state,
+        resourceRequest: { id: `${Date.now()}-${playerId}`, fromPlayerId: playerId, resource: action.resource },
+        log: [...state.log, `${asker.name} sucht ${TERRAIN_NAMES_DE[action.resource]}.`],
+      };
+    }
+
+    case "cancelResourceRequest": {
+      if (!state.resourceRequest) return state;
+      if (state.resourceRequest.fromPlayerId !== playerId) throw new GameError("Das ist nicht deine Anfrage.");
+      return { ...state, resourceRequest: null };
+    }
+
+    case "offerQuickTrade": {
+      const request = state.resourceRequest;
+      if (!request) throw new GameError("Es gibt gerade keine offene Anfrage.");
+      if (request.fromPlayerId === playerId) throw new GameError("Das ist deine eigene Anfrage.");
+      if (state.pendingTrade) throw new GameError("Es gibt bereits ein offenes Handelsangebot.");
+      const responder = state.players.find((p) => p.id === playerId);
+      const asker = state.players.find((p) => p.id === request.fromPlayerId);
+      if (!responder || !asker) throw new GameError("Handelspartner nicht gefunden.");
+      if (responder.resources[request.resource] < 1) throw new GameError(`Du hast kein ${TERRAIN_NAMES_DE[request.resource]} zum Abgeben.`);
+      if (action.wantInReturn === request.resource) throw new GameError("Wähle einen anderen Rohstoff als Gegenwert.");
+
+      const offer = {
+        id: `${Date.now()}-${playerId}`,
+        fromPlayerId: playerId,
+        toPlayerId: request.fromPlayerId,
+        give: { [request.resource]: 1 } as Partial<Record<ResourceType, number>>,
+        receive: { [action.wantInReturn]: 1 } as Partial<Record<ResourceType, number>>,
+      };
+      return {
+        ...state,
+        pendingTrade: offer,
+        log: [...state.log, `${responder.name} bietet ${asker.name} 1x ${TERRAIN_NAMES_DE[request.resource]} für 1x ${TERRAIN_NAMES_DE[action.wantInReturn]}.`],
+      };
     }
 
     case "endTurn": {

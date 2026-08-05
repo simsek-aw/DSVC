@@ -5,6 +5,16 @@ export type TerrainType = ResourceType | "desert";
 
 export const RESOURCE_TYPES: ResourceType[] = ["wood", "brick", "ore", "wheat", "sheep"];
 
+// Display names for log messages and errors, which are user-facing German.
+export const TERRAIN_NAMES_DE: Record<TerrainType, string> = {
+  wood: "Holz",
+  brick: "Lehm",
+  ore: "Erz",
+  wheat: "Weizen",
+  sheep: "Wolle",
+  desert: "Wüsten",
+};
+
 export interface Tile {
   coord: AxialCoord;
   terrain: TerrainType;
@@ -73,6 +83,15 @@ export interface TradeOffer {
   receive: Partial<Record<ResourceType, number>>;
 }
 
+// An open "I need X" shout-out to the whole table. Anyone actually holding
+// that resource can answer it with a one-for-one counter-offer, which then
+// runs through the normal TradeOffer accept/decline flow.
+export interface ResourceRequest {
+  id: string;
+  fromPlayerId: string;
+  resource: ResourceType;
+}
+
 export interface GameState {
   roomId: string;
   phase: GamePhase;
@@ -95,6 +114,7 @@ export interface GameState {
   longestRoadPlayerId: string | null;
   largestArmyPlayerId: string | null;
   pendingTrade: TradeOffer | null; // only one outstanding player-to-player offer at a time, for simplicity
+  resourceRequest: ResourceRequest | null; // one open "I need X" call at a time
   winnerId: string | null;
   log: string[];
 }
@@ -133,4 +153,7 @@ export type ClientAction =
   | { type: "bankTrade"; give: ResourceType; receive: ResourceType }
   | { type: "offerTrade"; toPlayerId: string; give: Partial<Record<ResourceType, number>>; receive: Partial<Record<ResourceType, number>> }
   | { type: "respondTrade"; accept: boolean }
+  | { type: "requestResource"; resource: ResourceType }
+  | { type: "cancelResourceRequest" }
+  | { type: "offerQuickTrade"; wantInReturn: ResourceType }
   | { type: "endTurn" };

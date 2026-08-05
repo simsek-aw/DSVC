@@ -131,6 +131,27 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
   const latestLogEntry = state.log[state.log.length - 1] ?? "";
 
+  // Double-tap on one of my own resource tiles shouts "I need this" to the
+  // table. Detected manually rather than via onDoubleClick so it behaves the
+  // same on touch, where the synthesized dblclick is unreliable.
+  const lastTapRef = useRef<{ resource: ResourceType; at: number } | null>(null);
+  const onResourceTap = (resource: ResourceType) => {
+    const now = Date.now();
+    const prev = lastTapRef.current;
+    if (prev && prev.resource === resource && now - prev.at < 400) {
+      lastTapRef.current = null;
+      sendAction({ type: "requestResource", resource });
+    } else {
+      lastTapRef.current = { resource, at: now };
+    }
+  };
+
+  const request = state.resourceRequest;
+  const requester = request ? state.players.find((p) => p.id === request.fromPlayerId) : null;
+  const iAmRequester = request?.fromPlayerId === myPlayerId;
+  // Only players actually holding the wanted resource get asked to help out.
+  const canAnswerRequest = !!request && !iAmRequester && !!me && me.resources[request.resource] > 0 && !state.pendingTrade;
+
   return (
     <div className="game-root">
       {turnPopup && (
@@ -266,7 +287,12 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         {me && (
           <div className="resource-panel">
             {RESOURCE_TYPES.map((key) => (
-              <div key={key} className="resource-chip" title={RESOURCE_LABELS[key]}>
+              <div
+                key={key}
+                className={`resource-chip ${request?.resource === key && iAmRequester ? "requested" : ""}`}
+                title={`${RESOURCE_LABELS[key]} — doppelt tippen, um danach zu fragen`}
+                onPointerDown={() => onResourceTap(key)}
+              >
                 {gains
                   .filter((g) => g.resource === key)
                   .map((g) => (
@@ -278,6 +304,33 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                 <span className="resource-count">{me.resources[key]}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {request && iAmRequester && (
+          <div className="request-banner own">
+            <span>
+              Du suchst {RESOURCE_ICONS[request.resource]} {RESOURCE_LABELS[request.resource].split(" ")[1]} — warte auf Angebote …
+            </span>
+            <button className="small" onClick={() => sendAction({ type: "cancelResourceRequest" })}>
+              Abbrechen
+            </button>
+          </div>
+        )}
+
+        {canAnswerRequest && request && (
+          <div className="request-banner">
+            <span>
+              {requester?.name} braucht {RESOURCE_ICONS[request.resource]}{" "}
+              {RESOURCE_LABELS[request.resource].split(" ")[1]} — was willst du dafür?
+            </span>
+            <div className="request-options">
+              {RESOURCE_TYPES.filter((r) => r !== request.resource).map((r) => (
+                <button key={r} onClick={() => sendAction({ type: "offerQuickTrade", wantInReturn: r })} title={RESOURCE_LABELS[r]}>
+                  {RESOURCE_ICONS[r]}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

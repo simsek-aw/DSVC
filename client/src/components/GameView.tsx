@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio, totalVictoryPoints } from "@canos/shared";
+import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio, totalVictoryPoints } from "@canos/shared";
 import { HexBoard, BuildMode } from "./HexBoard";
 
 interface Props {
@@ -44,6 +44,7 @@ export function GameView({ state, myPlayerId, sendAction }: Props) {
   const [tradeReceive, setTradeReceive] = useState<Partial<Record<ResourceType, number>>>({});
   const [showTradePanel, setShowTradePanel] = useState(false);
   const [showCards, setShowCards] = useState(false);
+  const [confirmingBuyCard, setConfirmingBuyCard] = useState(false);
 
   const me = state.players.find((p) => p.id === myPlayerId);
   const currentPlayerId = state.turnOrder[state.currentPlayerIndex];
@@ -118,6 +119,63 @@ export function GameView({ state, myPlayerId, sendAction }: Props) {
           ))}
         </div>
 
+        {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && !confirmingBuyCard && (
+          <div className="build-bar">
+            <BuildTile
+              icon="🛤️"
+              label="Straße"
+              cost={BUILD_COSTS.road}
+              resources={me?.resources}
+              active={buildMode === "road"}
+              onClick={() => setBuildMode(buildMode === "road" ? null : "road")}
+            />
+            <BuildTile
+              icon="🏠"
+              label="Siedlung"
+              cost={BUILD_COSTS.settlement}
+              resources={me?.resources}
+              active={buildMode === "settlement"}
+              onClick={() => setBuildMode(buildMode === "settlement" ? null : "settlement")}
+            />
+            <BuildTile
+              icon="🏙️"
+              label="Stadt"
+              cost={BUILD_COSTS.city}
+              resources={me?.resources}
+              active={buildMode === "city"}
+              onClick={() => setBuildMode(buildMode === "city" ? null : "city")}
+            />
+            <BuildTile
+              icon="🃏"
+              label="Entwicklung"
+              cost={BUILD_COSTS.developmentCard}
+              resources={me?.resources}
+              active={false}
+              onClick={() => setConfirmingBuyCard(true)}
+            />
+          </div>
+        )}
+
+        {confirmingBuyCard && (
+          <div className="confirm-banner">
+            <span>Entwicklungskarte kaufen ({describeResources(BUILD_COSTS.developmentCard)})?</span>
+            <div className="inline-picker">
+              <button
+                className="primary-button small"
+                onClick={() => {
+                  sendAction({ type: "buyDevelopmentCard" });
+                  setConfirmingBuyCard(false);
+                }}
+              >
+                Ja, kaufen
+              </button>
+              <button className="small" onClick={() => setConfirmingBuyCard(false)}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
         {me && (
           <div className="resource-panel">
             {RESOURCE_TYPES.map((key) => (
@@ -145,19 +203,6 @@ export function GameView({ state, myPlayerId, sendAction }: Props) {
             {state.lastDiceRoll?.total === 7 && !state.robberTileCoord && <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>}
             {state.lastDiceRoll && (
               <>
-                <button className={buildMode === "road" ? "toggle-active" : ""} onClick={() => setBuildMode(buildMode === "road" ? null : "road")}>
-                  🛤️ Straße
-                </button>
-                <button
-                  className={buildMode === "settlement" ? "toggle-active" : ""}
-                  onClick={() => setBuildMode(buildMode === "settlement" ? null : "settlement")}
-                >
-                  🏠 Siedlung
-                </button>
-                <button className={buildMode === "city" ? "toggle-active" : ""} onClick={() => setBuildMode(buildMode === "city" ? null : "city")}>
-                  🏙️ Stadt
-                </button>
-                <button onClick={() => sendAction({ type: "buyDevelopmentCard" })}>🃏 Karte kaufen</button>
                 <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
                   ✋ Hand ({me?.developmentCards.length ?? 0})
                 </button>
@@ -315,6 +360,48 @@ export function GameView({ state, myPlayerId, sendAction }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+function canAfford(resources: Record<ResourceType, number> | undefined, cost: Partial<Record<ResourceType, number>>): boolean {
+  if (!resources) return false;
+  return RESOURCE_TYPES.every((r) => resources[r] >= (cost[r] ?? 0));
+}
+
+function BuildTile({
+  icon,
+  label,
+  cost,
+  resources,
+  active,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  cost: Partial<Record<ResourceType, number>>;
+  resources: Record<ResourceType, number> | undefined;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const affordable = canAfford(resources, cost);
+  return (
+    <button
+      className={`build-tile ${active ? "toggle-active" : ""}`}
+      disabled={!affordable}
+      onClick={onClick}
+      title={!affordable ? "Nicht genug Rohstoffe" : undefined}
+    >
+      <span className="build-tile-icon">{icon}</span>
+      <span className="build-tile-label">{label}</span>
+      <span className="build-tile-cost">
+        {RESOURCE_TYPES.filter((r) => (cost[r] ?? 0) > 0).map((r) => (
+          <span key={r} className="build-tile-cost-item">
+            {RESOURCE_ICONS[r]}
+            {cost[r]}
+          </span>
+        ))}
+      </span>
+    </button>
   );
 }
 

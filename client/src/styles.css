@@ -117,17 +117,6 @@ body {
   color: #fff;
 }
 
-.leave-button {
-  align-self: flex-start;
-  background: transparent;
-  border: 1px solid #2a4a4f;
-  color: #a8dadc;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
 .divider {
   color: #6b8f94;
   font-size: 0.85rem;
@@ -250,7 +239,7 @@ body {
 .room-code-corner {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   background: rgba(13, 27, 30, 0.85);
   color: #a8dadc;
   padding: 4px 8px;
@@ -259,12 +248,58 @@ body {
   letter-spacing: 0.05em;
 }
 
-.sidebar {
-  width: 100%;
-  padding: 12px;
+.hamburger-menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
+}
+
+.hamburger-btn {
+  background: rgba(13, 27, 30, 0.85);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1.6;
+}
+
+.hamburger-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #142c30;
+  border: 1px solid #2a4a4f;
+  border-radius: 10px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  min-width: 140px;
+}
+
+.hamburger-dropdown button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hamburger-dropdown button:hover {
+  background: #1d3a3f;
+}
+
+.sidebar {
+  width: 100%;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   overflow-y: auto;
   background: #10242a;
 }
@@ -320,7 +355,7 @@ body {
   background: #142c30;
   border: 1px solid #2a4a4f;
   border-radius: 10px;
-  padding: 8px 4px;
+  padding: 6px 4px;
   color: #fff;
   cursor: pointer;
 }
@@ -406,43 +441,40 @@ body {
   }
 }
 
-.gain-indicator-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: visible;
-}
-
 .gain-indicator {
   position: absolute;
-  right: 6px;
-  top: -4px;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
   background: #2a9d8f;
   color: #fff;
   font-weight: 700;
-  font-size: 0.8rem;
-  padding: 3px 8px;
+  font-size: 0.75rem;
+  padding: 2px 7px;
   border-radius: 999px;
+  white-space: nowrap;
   animation: gain-float-up 1.6s ease forwards;
+  pointer-events: none;
 }
 
 @keyframes gain-float-up {
   0% {
     opacity: 0;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
   15% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translateY(-40px);
+    transform: translateX(-50%) translateY(-30px);
   }
 }
 
 .resource-chip {
+  position: relative;
   background: #142c30;
-  padding: 8px 4px;
+  padding: 5px 4px;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -479,11 +511,6 @@ body {
 .toggle-active {
   background: #f4a261 !important;
   color: #111 !important;
-}
-
-.dice-display {
-  font-size: 1.1rem;
-  text-align: center;
 }
 
 .dice-roller {
@@ -534,15 +561,63 @@ body {
 }
 
 .log-panel {
-  flex: 1;
-  overflow-y: auto;
   font-size: 0.8rem;
   color: #a8dadc;
+  border-top: 1px solid #2a4a4f;
+  padding-top: 4px;
+}
+
+.log-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: #a8dadc;
+  font-size: 0.8rem;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.log-latest {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.log-toggle-arrow {
+  flex-shrink: 0;
+  color: #f4a261;
+}
+
+.log-entries {
+  max-height: 180px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border-top: 1px solid #2a4a4f;
-  padding-top: 8px;
+  margin-top: 6px;
+}
+
+.bottom-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bottom-actions button {
+  width: 100%;
+  padding: 9px;
+  border-radius: 10px;
+  border: 1px solid #2a4a4f;
+  background: #142c30;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
 }
 
 .mode-hint {

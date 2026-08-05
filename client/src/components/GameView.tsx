@@ -46,6 +46,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [showTradePanel, setShowTradePanel] = useState(false);
   const [showCards, setShowCards] = useState(false);
   const [confirmingBuyCard, setConfirmingBuyCard] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [logExpanded, setLogExpanded] = useState(false);
 
   const me = state.players.find((p) => p.id === myPlayerId);
   const currentPlayerId = state.turnOrder[state.currentPlayerIndex];
@@ -72,7 +74,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const outgoingTrade = state.pendingTrade && state.pendingTrade.fromPlayerId === myPlayerId ? state.pendingTrade : null;
 
   const [turnPopup, setTurnPopup] = useState<string | null>(null);
-  const [gains, setGains] = useState<{ id: string; icon: string; amount: number }[]>([]);
+  const [gains, setGains] = useState<{ id: string; resource: ResourceType; amount: number }[]>([]);
   const lastRollKeyRef = useRef<string>("");
   const prevPlayerIndexRef = useRef<number | null>(null);
   const prevResourcesRef = useRef(me?.resources);
@@ -108,16 +110,16 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     prevPlayerIndexRef.current = state.currentPlayerIndex;
   }, [state.currentPlayerIndex, state.phase]);
 
-  // Floating "+N" indicators whenever my own resources increase (dice
-  // production, trades, dev cards, ...).
+  // Floating "+N" indicators anchored above whichever resource actually
+  // increased (dice production, trades, dev cards, ...).
   useEffect(() => {
     if (!me) return;
     const prev = prevResourcesRef.current;
     if (prev) {
-      const newGains: { id: string; icon: string; amount: number }[] = [];
+      const newGains: { id: string; resource: ResourceType; amount: number }[] = [];
       for (const r of RESOURCE_TYPES) {
         const diff = me.resources[r] - (prev[r] ?? 0);
-        if (diff > 0) newGains.push({ id: `${Date.now()}-${r}-${Math.random()}`, icon: RESOURCE_ICONS[r], amount: diff });
+        if (diff > 0) newGains.push({ id: `${Date.now()}-${r}-${Math.random()}`, resource: r, amount: diff });
       }
       if (newGains.length > 0) {
         setGains((g) => [...g, ...newGains]);
@@ -126,6 +128,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     }
     prevResourcesRef.current = me.resources;
   }, [me?.resources]);
+
+  const latestLogEntry = state.log[state.log.length - 1] ?? "";
 
   return (
     <div className="game-root">
@@ -145,6 +149,25 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         />
         <div className="room-code-corner" title="Raum-Code — zum Wiederbeitreten mit demselben Namen eingeben">
           {state.roomId}
+        </div>
+        <div className="hamburger-menu">
+          <button className="hamburger-btn" onClick={() => setMenuOpen((v) => !v)} aria-label="Menü">
+            ☰
+          </button>
+          {menuOpen && (
+            <div className="hamburger-dropdown">
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (window.confirm("Spiel wirklich verlassen? Ein laufendes Spiel kannst du auf diesem Gerät danach nicht mehr fortsetzen.")) {
+                    onLeave();
+                  }
+                }}
+              >
+                ← Verlassen
+              </button>
+            </div>
+          )}
         </div>
         <div className="turn-banner">
           {state.phase === "setup" && (
@@ -171,17 +194,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       </div>
 
       <div className="sidebar">
-        <button
-          className="leave-button"
-          onClick={() => {
-            if (window.confirm("Spiel wirklich verlassen? Ein laufendes Spiel kannst du auf diesem Gerät danach nicht mehr fortsetzen.")) {
-              onLeave();
-            }
-          }}
-        >
-          ← Verlassen
-        </button>
-
         <div className="player-cards">
           {state.players.map((p) => (
             <div key={p.id} className={`player-card ${p.id === currentPlayerId ? "active" : ""}`} style={{ borderColor: p.color }}>
@@ -255,19 +267,17 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <div className="resource-panel">
             {RESOURCE_TYPES.map((key) => (
               <div key={key} className="resource-chip" title={RESOURCE_LABELS[key]}>
+                {gains
+                  .filter((g) => g.resource === key)
+                  .map((g) => (
+                    <span key={g.id} className="gain-indicator">
+                      +{g.amount}
+                    </span>
+                  ))}
                 <span className="resource-icon">{RESOURCE_ICONS[key]}</span>
                 <span className="resource-count">{me.resources[key]}</span>
               </div>
             ))}
-            {gains.length > 0 && (
-              <div className="gain-indicator-layer">
-                {gains.map((g) => (
-                  <span key={g.id} className="gain-indicator">
-                    +{g.amount} {g.icon}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -281,19 +291,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <div className="action-bar">
             <DiceRoller serverRoll={state.lastDiceRoll} onRoll={() => sendAction({ type: "rollDice" })} />
             {state.lastDiceRoll?.total === 7 && !state.robberTileCoord && <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>}
-            {state.lastDiceRoll && (
-              <>
-                <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
-                  ✋ Hand ({me?.developmentCards.length ?? 0})
-                </button>
-                <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
-                  🔁 Handel
-                </button>
-                <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
-                  Zug beenden
-                </button>
-              </>
-            )}
           </div>
         )}
 
@@ -422,22 +419,38 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {state.lastDiceRoll && (
-          <div className="dice-display">
-            🎲 {state.lastDiceRoll.die1} + {state.lastDiceRoll.die2} = {state.lastDiceRoll.total}
+        <div className="log-panel">
+          <button className="log-header" onClick={() => setLogExpanded((v) => !v)}>
+            <span className="log-latest">{latestLogEntry}</span>
+            <span className="log-toggle-arrow">{logExpanded ? "▾" : "▸"}</span>
+          </button>
+          {logExpanded && (
+            <div className="log-entries">
+              {state.log
+                .slice(-30)
+                .reverse()
+                .map((entry, i) => (
+                  <div key={i} className="log-entry">
+                    {entry}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && (
+          <div className="bottom-actions">
+            <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
+              🃏 Karten ({me?.developmentCards.length ?? 0})
+            </button>
+            <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
+              🔁 Handel
+            </button>
+            <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
+              Zug beenden
+            </button>
           </div>
         )}
-
-        <div className="log-panel">
-          {state.log
-            .slice(-30)
-            .reverse()
-            .map((entry, i) => (
-              <div key={i} className="log-entry">
-                {entry}
-              </div>
-            ))}
-        </div>
       </div>
     </div>
   );
@@ -484,7 +497,7 @@ function DiceRoller({
     if (intervalRef.current) clearInterval(intervalRef.current);
   }, []);
 
-  if (serverRoll && !rolling) return null; // already rolled — the log/result display below takes over
+  if (serverRoll && !rolling) return null; // already rolled — the popup/log already told us the result
 
   const onPointerDown = (e: React.PointerEvent) => {
     dragStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() };
@@ -495,8 +508,7 @@ function DiceRoller({
     if (!start) return;
     const dist = Math.hypot(e.clientX - start.x, e.clientY - start.y);
     const dt = Date.now() - start.t;
-    // A clear flick (far + fast) or a plain tap both roll — the flick is just
-    // the fun way to trigger the same thing a click already would.
+    // A clear flick (far + fast) or a plain tap/press both roll.
     if ((dist > 15 && dt < 600) || dist < 8) triggerRoll();
   };
 
@@ -514,7 +526,7 @@ function DiceRoller({
     >
       <span className="dice-face">{DICE_FACES[display[0]]}</span>
       <span className="dice-face">{DICE_FACES[display[1]]}</span>
-      <span className="dice-hint">{rolling ? "…" : "Wischen zum Würfeln"}</span>
+      <span className="dice-hint">{rolling ? "…" : "Drücken zum Würfeln"}</span>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio, totalVictoryPoints } from "@canos/shared";
+import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio } from "@canos/shared";
 import { HexBoard, BuildMode } from "./HexBoard";
 
 interface Props {
@@ -111,7 +111,6 @@ export function GameView({ state, myPlayerId, sendAction }: Props) {
             <div key={p.id} className={`player-card ${p.id === currentPlayerId ? "active" : ""}`} style={{ borderColor: p.color }}>
               <span className="player-dot" style={{ background: p.color }} />
               <span className="player-name">{p.name}</span>
-              <span className="player-vp">{totalVictoryPoints(state, p.id)} VP</span>
               {state.longestRoadPlayerId === p.id && <span className="badge" title="Längste Straße">🛣️</span>}
               {state.largestArmyPlayerId === p.id && <span className="badge" title="Größte Rittermacht">⚔️</span>}
               {!p.connected && <span className="offline-badge">offline</span>}

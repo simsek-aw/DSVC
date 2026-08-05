@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import http from "http";
+import path from "path";
 import { customAlphabet } from "nanoid";
 import { Server } from "socket.io";
 import { addPlayer, applyAction, createLobby, GameError, GameState, setPlayerConnected } from "@canos/shared";
@@ -14,6 +15,14 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
+
+// Serve the built client so a single deployed service handles both the
+// Socket.IO API and the static frontend (no separate hosting needed).
+const clientDistPath = path.join(__dirname, "..", "..", "client", "dist");
+app.use(express.static(clientDistPath));
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(clientDistPath, "index.html"));
+});
 
 loadAllRoomsFromDisk();
 

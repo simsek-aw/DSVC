@@ -1,0 +1,37 @@
+# Fly.io app configuration for Canos Incognita.
+#
+# First-time setup (run once, from a machine/session with network access to
+# fly.io — this repo's own dev session has that host blocked by policy):
+#
+#   fly auth login
+#   fly apps create canos-incognita        # or let `fly launch` pick a name
+#   fly volumes create canos_data --region fra --size 1
+#   fly deploy
+#
+# If the app name "canos-incognita" is already taken, change it below (and
+# in the `fly apps create` command) to something unique first.
+
+app = "canos-incognita"
+primary_region = "fra"
+
+[build]
+
+[env]
+  PORT = "8080"
+  ROOM_DATA_DIR = "/data/rooms"
+
+[[mounts]]
+  source = "canos_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

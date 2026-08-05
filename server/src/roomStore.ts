@@ -2,7 +2,9 @@ import fs from "fs";
 import path from "path";
 import { GameState } from "@canos/shared";
 
-const DATA_DIR = path.join(__dirname, "..", "data", "rooms");
+// Overridable so a deployment can point this at a mounted persistent volume
+// (e.g. Fly.io) instead of the container's ephemeral local disk.
+const DATA_DIR = process.env.ROOM_DATA_DIR ?? path.join(__dirname, "..", "data", "rooms");
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 

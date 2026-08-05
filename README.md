@@ -97,8 +97,34 @@ npm run dev:server        # Server auf Port 4000
 npm run dev:client        # Client auf Port 5173 (Vite)
 ```
 
-Der Client verbindet sich standardmäßig mit `http://<hostname>:4000`. Für ein Deployment
-auf getrennten Domains `VITE_SERVER_URL` als Env-Variable für den Client setzen.
+Im Dev-Modus verbindet sich der Client automatisch mit `http://<hostname>:4000`. Für ein
+Deployment mit getrennten Domains für Client und Server `VITE_SERVER_URL` als Env-Variable
+für den Client-Build setzen — im kombinierten Deployment (siehe unten) ist das nicht nötig,
+da der Server den gebauten Client selbst mit ausliefert (gleicher Origin).
 
 Auf dem Handy: Client-URL im Browser öffnen, Raum erstellen/beitreten, Karte per Ziehen
 verschieben und per Zwei-Finger-Pinch zoomen.
+
+## Deployment auf Fly.io
+
+Der Server liefert im Produktionsbuild den gebauten Client gleich mit aus (siehe
+`server/src/index.ts`), es läuft also nur **ein** Dienst. Das `Dockerfile` und die
+`fly.toml` im Repo-Root sind dafür vorbereitet; der Raum-Zustand wird über die Env-Variable
+`ROOM_DATA_DIR` auf ein persistentes Volume geschrieben, damit Langzeitspiele einen
+Neustart/Redeploy überleben.
+
+Einmalig (mit der [flyctl-CLI](https://fly.io/docs/flyctl/install/), von einer Maschine mit
+Netzwerkzugriff auf fly.io — dieses Entwicklungs-Sandbox-Environment hat `fly.io` per
+Netzwerk-Policy blockiert und kann den Deploy nicht selbst ausführen):
+
+```bash
+fly auth login
+fly apps create canos-incognita        # Name in fly.toml anpassen, falls schon vergeben
+fly volumes create canos_data --region fra --size 1
+fly deploy
+```
+
+Danach für jedes weitere Update einfach erneut `fly deploy` ausführen. `fly.toml` ist so
+konfiguriert, dass die Maschine bei Inaktivität automatisch stoppt (spart Kosten) und bei
+neuen Verbindungen automatisch wieder hochfährt — laufende WebSocket-Verbindungen verhindern
+das Stoppen währenddessen.

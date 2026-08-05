@@ -40,6 +40,22 @@ body {
   font-size: 1.2rem;
 }
 
+.error-screen {
+  margin: auto;
+  padding: 24px;
+  width: min(420px, 92vw);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.error-detail {
+  color: #a8dadc;
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
 /* Lobby */
 .lobby-screen {
   margin: auto;

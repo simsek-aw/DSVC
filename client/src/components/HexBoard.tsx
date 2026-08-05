@@ -41,55 +41,83 @@ function tilePolygonPoints(center: { x: number; y: number }, size: number): stri
     .join(" ");
 }
 
+type Gesture =
+  | { kind: "pan"; startX: number; startY: number; viewX: number; viewY: number }
+  | { kind: "pinch"; startDist: number; startScale: number }
+  | null;
+
+function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdges, onSelectFreeRoadEdge }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ scale: 48, x: 0, y: 0 });
-  const dragRef = useRef<{ startX: number; startY: number; viewX: number; viewY: number } | null>(null);
-  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
+
+  // Pointer Events alone (no separate legacy Touch Events) unify mouse, touch
+  // and pen across modern browsers — mixing both APIs on the same element is
+  // what previously let a two-finger touch fire pan and pinch logic at once
+  // and fight over `view`. Every active pointer's last known position lives
+  // here; the gesture is derived fresh from however many are currently down.
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<Gesture>(null);
 
   const graph = useMemo(() => buildBoardGraph(state.tiles, TILE_SIZE), [state.tiles]);
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    dragRef.current = { startX: e.clientX, startY: e.clientY, viewX: view.x, viewY: view.y };
+  const restartGesture = () => {
+    const points = Array.from(pointersRef.current.values());
+    if (points.length >= 2) {
+      gestureRef.current = { kind: "pinch", startDist: distanceBetween(points[0], points[1]), startScale: view.scale };
+    } else if (points.length === 1) {
+      gestureRef.current = { kind: "pan", startX: points[0].x, startY: points[0].y, viewX: view.x, viewY: view.y };
+    } else {
+      gestureRef.current = null;
+    }
   };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    try {
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+    } catch {
+      // Some browsers/elements can reject pointer capture — panning still
+      // works without it, so just carry on rather than breaking the drag.
+    }
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    restartGesture();
+  };
+
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current) return;
+    if (!pointersRef.current.has(e.pointerId)) return;
     // Stop the browser from also treating this as a page-scroll/swipe gesture
     // (belt-and-suspenders alongside the CSS touch-action: none below).
     e.preventDefault();
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    setView((v) => ({ ...v, x: dragRef.current!.viewX + dx, y: dragRef.current!.viewY + dy }));
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    const points = Array.from(pointersRef.current.values());
+
+    if (gesture.kind === "pinch" && points.length >= 2) {
+      const dist = distanceBetween(points[0], points[1]);
+      if (!Number.isFinite(dist) || dist <= 0) return;
+      const nextScale = Math.min(120, Math.max(20, gesture.startScale * (dist / gesture.startDist)));
+      if (Number.isFinite(nextScale)) setView((v) => ({ ...v, scale: nextScale }));
+    } else if (gesture.kind === "pan" && points.length === 1) {
+      const dx = points[0].x - gesture.startX;
+      const dy = points[0].y - gesture.startY;
+      if (Number.isFinite(dx) && Number.isFinite(dy)) {
+        setView((v) => ({ ...v, x: gesture.viewX + dx, y: gesture.viewY + dy }));
+      }
+    }
   };
-  const onPointerUp = () => {
-    dragRef.current = null;
+
+  const endPointer = (e: React.PointerEvent) => {
+    pointersRef.current.delete(e.pointerId);
+    restartGesture();
   };
+
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     setView((v) => ({ ...v, scale: Math.min(120, Math.max(20, v.scale - e.deltaY * 0.05)) }));
-  };
-
-  // Pinch-to-zoom for touch devices.
-  const touchDistance = (touches: React.TouchList) => {
-    const [a, b] = [touches[0], touches[1]];
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  };
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      pinchRef.current = { startDist: touchDistance(e.touches), startScale: view.scale };
-    }
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchRef.current) {
-      e.preventDefault();
-      const dist = touchDistance(e.touches);
-      const ratio = dist / pinchRef.current.startDist;
-      setView((v) => ({ ...v, scale: Math.min(120, Math.max(20, pinchRef.current!.startScale * ratio)) }));
-    }
-  };
-  const onTouchEnd = () => {
-    pinchRef.current = null;
   };
 
   const px = (coord: AxialCoord) => axialToPixel(coord, view.scale);
@@ -117,12 +145,10 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
       style={{ touchAction: "none" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerLeave={onPointerUp}
+      onPointerUp={endPointer}
+      onPointerLeave={endPointer}
+      onPointerCancel={endPointer}
       onWheel={onWheel}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
     >
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
         {state.tiles.map((tile) => {

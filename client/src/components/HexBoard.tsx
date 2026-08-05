@@ -55,6 +55,9 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragRef.current) return;
+    // Stop the browser from also treating this as a page-scroll/swipe gesture
+    // (belt-and-suspenders alongside the CSS touch-action: none below).
+    e.preventDefault();
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
     setView((v) => ({ ...v, x: dragRef.current!.viewX + dx, y: dragRef.current!.viewY + dy }));
@@ -111,6 +114,7 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
     <svg
       ref={svgRef}
       className="hex-board"
+      style={{ touchAction: "none" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

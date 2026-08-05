@@ -6,10 +6,14 @@
 html, body, #root {
   height: 100%;
   margin: 0;
+  /* Without this, a drag that the browser interprets as a page scroll (mobile
+     Safari/Chrome quirks around 100vh + touch-action) reveals whatever lies
+     beyond the app's content — i.e. a "blank" default page background. */
+  overflow: hidden;
+  background: #0d1b1e;
 }
 
 body {
-  background: #0d1b1e;
   color: #f1faee;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   overscroll-behavior: none;
@@ -22,10 +26,13 @@ body {
 }
 
 .app-root {
-  height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100dvw;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .centered-message {

@@ -82,6 +82,9 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           freeRoadEdges={buildMode === "roadBuilding" ? freeRoadEdges : undefined}
           onSelectFreeRoadEdge={onSelectFreeRoadEdge}
         />
+        <div className="room-code-corner" title="Raum-Code — zum Wiederbeitreten mit demselben Namen eingeben">
+          {state.roomId}
+        </div>
         <div className="turn-banner">
           {state.phase === "setup" && (
             <span>

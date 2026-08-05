@@ -246,6 +246,18 @@ body {
   white-space: nowrap;
 }
 
+.room-code-corner {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(13, 27, 30, 0.85);
+  color: #a8dadc;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+}
+
 .sidebar {
   width: 100%;
   padding: 12px;
@@ -537,4 +549,17 @@ body {
   padding: 10px 16px;
   border-radius: 10px;
   z-index: 999;
+}
+
+.reconnect-banner {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f4a261;
+  color: #111;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  z-index: 998;
 }

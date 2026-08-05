@@ -25,6 +25,11 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession());
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // True only once the CURRENT socket connection has confirmed which player
+  // it is (via "joined", from createRoom/joinRoom/rejoin). False in between —
+  // e.g. right after a reconnect, before "rejoin" round-trips — so actions
+  // can be blocked instead of silently being sent under the wrong identity.
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
 
   // Mirrors `session`/whether we've ever received real state for the current
   // socket handlers below, which are bound once (empty deps) and would
@@ -37,6 +42,7 @@ export default function App() {
       sessionRef.current = payload;
       setSession(payload);
       localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+      setIdentityConfirmed(true);
     };
     const onState = (s: GameState) => {
       hasStateRef.current = true;
@@ -44,6 +50,11 @@ export default function App() {
     };
     const onConnect = () => {
       if (sessionRef.current) socket.emit("rejoin", sessionRef.current);
+    };
+    const onDisconnect = () => {
+      // The socket will get a new id on reconnect; nothing sent before the
+      // next "joined" confirms our identity again should be trusted.
+      setIdentityConfirmed(false);
     };
     const onError = (msg: string) => {
       setError(msg);
@@ -62,6 +73,7 @@ export default function App() {
     socket.on("state", onState);
     socket.on("errorMessage", onError);
     socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
 
     if (sessionRef.current && socket.connected) socket.emit("rejoin", sessionRef.current);
 
@@ -70,11 +82,17 @@ export default function App() {
       socket.off("state", onState);
       socket.off("errorMessage", onError);
       socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
     };
   }, []);
 
   const sendAction = (action: any) => {
     if (!session) return;
+    if (!identityConfirmed) {
+      setError("Verbindung wird wiederhergestellt, bitte kurz warten …");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
     socket.emit("action", { roomId: session.roomId, action });
   };
 
@@ -91,6 +109,7 @@ export default function App() {
       {error && <div className="toast-error">{error}</div>}
       {!session && <Lobby />}
       {session && !state && <div className="centered-message">Verbinde …</div>}
+      {session && state && !identityConfirmed && <div className="reconnect-banner">Verbindung wird wiederhergestellt …</div>}
       {session && state && state.phase === "lobby" && (
         <WaitingRoom state={state} myPlayerId={session.playerId} roomId={session.roomId} sendAction={sendAction} onLeave={leaveRoom} />
       )}

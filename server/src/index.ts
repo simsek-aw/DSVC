@@ -34,12 +34,20 @@ function broadcastState(roomId: string) {
   if (state) io.to(roomId).emit("state", state);
 }
 
+function sameName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ playerName }: { playerName: string }) => {
     const roomId = generateRoomId();
     let state: GameState = createLobby(roomId);
     state = addPlayer(state, socket.id, playerName || "Spieler");
     saveRoom(state);
+    // Tag this socket connection with its player id explicitly rather than
+    // relying on socket.id staying valid — after any reconnect socket.id
+    // changes, and "rejoin" is what re-establishes this tag on the new socket.
+    (socket as any).canosPlayerId = socket.id;
     socket.join(roomId);
     socket.emit("joined", { roomId, playerId: socket.id });
     broadcastState(roomId);
@@ -51,9 +59,27 @@ io.on("connection", (socket) => {
       socket.emit("errorMessage", "Raum nicht gefunden.");
       return;
     }
-    try {
-      const state = addPlayer(existing, socket.id, playerName || "Spieler");
+    const name = playerName || "Spieler";
+
+    // A disconnected player with the same name reclaims their existing seat
+    // instead of getting a brand new one — this is what lets someone type the
+    // room code to get back in after leaving or losing their session, even
+    // once the game has already started (when a fresh addPlayer is blocked).
+    const reclaimable = existing.players.find((p) => !p.connected && sameName(p.name, name));
+    if (reclaimable) {
+      (socket as any).canosPlayerId = reclaimable.id;
+      socket.join(roomId);
+      const state = setPlayerConnected(existing, reclaimable.id, true);
       saveRoom(state);
+      socket.emit("joined", { roomId, playerId: reclaimable.id });
+      broadcastState(roomId);
+      return;
+    }
+
+    try {
+      const state = addPlayer(existing, socket.id, name);
+      saveRoom(state);
+      (socket as any).canosPlayerId = socket.id;
       socket.join(roomId);
       socket.emit("joined", { roomId, playerId: socket.id });
       broadcastState(roomId);
@@ -79,19 +105,24 @@ io.on("connection", (socket) => {
 
   socket.on("leaveRoom", ({ roomId }: { roomId: string }) => {
     const state = getRoom(roomId);
-    if (!state) return;
-    const playerId = (socket as any).canosPlayerId ?? socket.id;
+    const playerId = (socket as any).canosPlayerId;
+    if (!state || !playerId) return;
+    socket.leave(roomId);
     try {
       const next = removePlayer(state, playerId);
-      socket.leave(roomId);
       if (next.players.length === 0) {
         deleteRoom(roomId);
       } else {
         saveRoom(next);
         broadcastState(roomId);
       }
-    } catch (err) {
-      socket.emit("errorMessage", err instanceof GameError ? err.message : "Verlassen fehlgeschlagen.");
+    } catch {
+      // Game already started — the player's seat has to stay (turn order/setup
+      // depend on it), so just mark them disconnected instead of removing them.
+      // They can reclaim the seat later by joining with the same name.
+      const next = setPlayerConnected(state, playerId, false);
+      saveRoom(next);
+      broadcastState(roomId);
     }
   });
 
@@ -101,7 +132,14 @@ io.on("connection", (socket) => {
       socket.emit("errorMessage", "Raum nicht gefunden.");
       return;
     }
-    const playerId = (socket as any).canosPlayerId ?? socket.id;
+    const playerId = (socket as any).canosPlayerId;
+    if (!playerId) {
+      // Reconnect handshake ("rejoin") hasn't completed on this socket yet —
+      // silently falling back to socket.id here used to misattribute actions
+      // to a brand new, nonexistent player after any reconnect.
+      socket.emit("errorMessage", "Verbindung wird noch hergestellt, bitte kurz warten und erneut versuchen.");
+      return;
+    }
     try {
       const next = applyAction(state, playerId, action);
       saveRoom(next);
@@ -112,10 +150,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    const playerId = (socket as any).canosPlayerId;
+    if (!playerId) return;
     for (const roomId of socket.rooms) {
       const state = getRoom(roomId);
       if (!state) continue;
-      const playerId = (socket as any).canosPlayerId ?? socket.id;
       if (state.players.some((p) => p.id === playerId)) {
         const next = setPlayerConnected(state, playerId, false);
         saveRoom(next);

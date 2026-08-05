@@ -4,7 +4,16 @@ import http from "http";
 import path from "path";
 import { customAlphabet } from "nanoid";
 import { Server } from "socket.io";
-import { addPlayer, applyAction, createLobby, GameError, GameState, removePlayer, setPlayerConnected } from "@canos/shared";
+import {
+  addPlayer,
+  applyAction,
+  createDemoLobby,
+  createLobby,
+  GameError,
+  GameState,
+  removePlayer,
+  setPlayerConnected,
+} from "@canos/shared";
 import { deleteRoom, getRoom, loadAllRoomsFromDisk, saveRoom } from "./roomStore";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -50,6 +59,17 @@ io.on("connection", (socket) => {
     (socket as any).canosPlayerId = socket.id;
     socket.join(roomId);
     socket.emit("joined", { roomId, playerId: socket.id });
+    broadcastState(roomId);
+  });
+
+  socket.on("createDemoRoom", ({ playerNames }: { playerNames?: string[] }) => {
+    const names = playerNames?.length ? playerNames.slice(0, 6) : ["Spieler 1", "Spieler 2", "Spieler 3"];
+    const roomId = generateRoomId();
+    const state = createDemoLobby(roomId, names);
+    saveRoom(state);
+    (socket as any).canosPlayerId = state.players[0].id;
+    socket.join(roomId);
+    socket.emit("joined", { roomId, playerId: state.players[0].id });
     broadcastState(roomId);
   });
 
@@ -126,13 +146,19 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("action", ({ roomId, action }: { roomId: string; action: any }) => {
+  socket.on("action", ({ roomId, action, asPlayerId }: { roomId: string; action: any; asPlayerId?: string }) => {
     const state = getRoom(roomId);
     if (!state) {
       socket.emit("errorMessage", "Raum nicht gefunden.");
       return;
     }
-    const playerId = (socket as any).canosPlayerId;
+    // Demo rooms are single-device sandboxes, so this one connection is
+    // allowed to act for any seat in them. Everywhere else the socket's own
+    // confirmed identity is the only thing that counts.
+    const playerId =
+      state.demoMode && asPlayerId && state.players.some((p) => p.id === asPlayerId)
+        ? asPlayerId
+        : (socket as any).canosPlayerId;
     if (!playerId) {
       // Reconnect handshake ("rejoin") hasn't completed on this socket yet —
       // silently falling back to socket.id here used to misattribute actions

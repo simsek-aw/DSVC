@@ -29,11 +29,13 @@ export type {
   DiceRoll,
   TradeOffer,
   ResourceRequest,
+  Negotiation,
   GameState,
   ClientAction,
 } from "./types";
 export {
   RESOURCE_TYPES,
+  TERRAIN_NAMES_DE,
   BUILD_COSTS,
   VICTORY_POINTS_TO_WIN,
   LONGEST_ROAD_MIN_LENGTH,
@@ -51,6 +53,7 @@ export {
   TILE_SIZE,
   GameError,
   createLobby,
+  createDemoLobby,
   addPlayer,
   removePlayer,
   setPlayerConnected,

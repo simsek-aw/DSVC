@@ -86,6 +86,33 @@ export default function App() {
     };
   }, []);
 
+  // In a demo room this device speaks for whichever seat is currently
+  // selected; everywhere else it is always the session's own player.
+  const [demoActivePlayerId, setDemoActivePlayerId] = useState<string | null>(null);
+  const prevTurnPlayerRef = useRef<string | null>(null);
+
+  const isDemo = !!state?.demoMode;
+  const effectivePlayerId = (isDemo ? demoActivePlayerId : null) ?? session?.playerId ?? "";
+
+  // Follow the turn automatically in demo mode so solo testing doesn't need a
+  // manual switch every round — but only when the turn actually moves, so a
+  // deliberate manual switch (e.g. to answer a trade) isn't overridden.
+  useEffect(() => {
+    if (!isDemo || !state) return;
+    // Keyed on the player actually holding the turn rather than the index:
+    // the index stays 0 when the game moves from turn-order rolling into
+    // setup, even though turnOrder only gets populated at that moment.
+    const turnPlayer = state.turnOrder[state.currentPlayerIndex] ?? null;
+    if (turnPlayer && turnPlayer !== prevTurnPlayerRef.current) {
+      prevTurnPlayerRef.current = turnPlayer;
+      setDemoActivePlayerId(turnPlayer);
+    }
+  }, [isDemo, state?.currentPlayerIndex, state?.turnOrder]);
+
+  useEffect(() => {
+    if (isDemo && !demoActivePlayerId && state?.players.length) setDemoActivePlayerId(state.players[0].id);
+  }, [isDemo, demoActivePlayerId, state?.players]);
+
   const sendAction = (action: any) => {
     if (!session) return;
     if (!identityConfirmed) {
@@ -93,7 +120,11 @@ export default function App() {
       setTimeout(() => setError(null), 3000);
       return;
     }
-    socket.emit("action", { roomId: session.roomId, action });
+    socket.emit("action", {
+      roomId: session.roomId,
+      action,
+      ...(isDemo ? { asPlayerId: effectivePlayerId } : {}),
+    });
   };
 
   const leaveRoom = () => {
@@ -110,11 +141,27 @@ export default function App() {
       {!session && <Lobby />}
       {session && !state && <div className="centered-message">Verbinde …</div>}
       {session && state && !identityConfirmed && <div className="reconnect-banner">Verbindung wird wiederhergestellt …</div>}
+      {session && state && isDemo && (
+        <div className="demo-switcher">
+          <span className="demo-label">DEMO</span>
+          {state.players.map((p) => (
+            <button
+              key={p.id}
+              className={p.id === effectivePlayerId ? "active" : ""}
+              style={{ borderColor: p.color }}
+              onClick={() => setDemoActivePlayerId(p.id)}
+            >
+              <span className="player-dot" style={{ background: p.color }} />
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
       {session && state && state.phase === "lobby" && (
-        <WaitingRoom state={state} myPlayerId={session.playerId} roomId={session.roomId} sendAction={sendAction} onLeave={leaveRoom} />
+        <WaitingRoom state={state} myPlayerId={effectivePlayerId} roomId={session.roomId} sendAction={sendAction} onLeave={leaveRoom} />
       )}
       {session && state && state.phase !== "lobby" && (
-        <GameView state={state} myPlayerId={session.playerId} sendAction={sendAction} onLeave={leaveRoom} />
+        <GameView state={state} myPlayerId={effectivePlayerId} sendAction={sendAction} onLeave={leaveRoom} />
       )}
     </div>
   );

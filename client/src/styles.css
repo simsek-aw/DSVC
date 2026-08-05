@@ -803,3 +803,226 @@ body {
   border-radius: 999px;
   z-index: 998;
 }
+
+/* --- Demo mode --- */
+.demo-button {
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px dashed #f4a261;
+  background: transparent;
+  color: #f4a261;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #3f2a1d;
+  border-bottom: 1px solid #f4a261;
+  overflow-x: auto;
+  flex-shrink: 0;
+  /* Must stay above the negotiation overlay: playing both sides of a trade
+     from one device is the whole point of demo mode. */
+  position: relative;
+  z-index: 950;
+}
+
+.demo-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #f4a261;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
+.demo-switcher button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 2px solid;
+  background: #142c30;
+  color: #fff;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.demo-switcher button.active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px #f4a261;
+}
+
+/* --- Player card menu (tap a name to trade) --- */
+.player-card-wrap {
+  position: relative;
+}
+
+.player-card {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.player-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  background: #142c30;
+  border: 1px solid #2a4a4f;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.player-menu button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.player-menu button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Negotiation table --- */
+.negotiation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(6, 14, 16, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.negotiation-box {
+  width: min(440px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #10242a;
+  border: 2px solid #8338ec;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.negotiation-box.invite {
+  align-items: center;
+  text-align: center;
+}
+
+.negotiation-box h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.negotiation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.negotiation-header .small {
+  background: transparent;
+  border: none;
+  color: #a8dadc;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.table-side {
+  background: #142c30;
+  border: 1px solid #2a4a4f;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 74px;
+}
+
+.table-side.mine {
+  border-color: #2a9d8f;
+}
+
+.table-side.confirmed {
+  box-shadow: 0 0 0 2px #2a9d8f inset;
+}
+
+.table-side-label {
+  font-size: 0.72rem;
+  color: #a8dadc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.table-slot {
+  background: #1d3a3f;
+  border: 1px solid #2a4a4f;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.table-slot.removable {
+  cursor: pointer;
+}
+
+.table-empty {
+  color: #52796f;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.negotiation-hand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.negotiation-hand-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.negotiation-hand-row button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #142c30;
+  border: 1px solid #2a4a4f;
+  border-radius: 8px;
+  padding: 7px 2px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.negotiation-hand-row button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

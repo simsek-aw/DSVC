@@ -92,6 +92,18 @@ export interface ResourceRequest {
   resource: ResourceType;
 }
 
+// The "big trade": a shared negotiation table two players push resources onto
+// until both confirm. Any change to either side clears both confirmations, so
+// nobody can quietly alter the deal after the other side has agreed.
+export interface Negotiation {
+  id: string;
+  initiatorId: string;
+  partnerId: string;
+  status: "pending" | "open"; // pending = invitation sent, open = table live
+  offers: Record<string, Partial<Record<ResourceType, number>>>; // keyed by player id
+  confirmed: Record<string, boolean>; // keyed by player id
+}
+
 export interface GameState {
   roomId: string;
   phase: GamePhase;
@@ -115,6 +127,10 @@ export interface GameState {
   largestArmyPlayerId: string | null;
   pendingTrade: TradeOffer | null; // only one outstanding player-to-player offer at a time, for simplicity
   resourceRequest: ResourceRequest | null; // one open "I need X" call at a time
+  negotiation: Negotiation | null; // one open negotiation table at a time
+  // Demo rooms let a single device act as every player, so one person can try
+  // the whole game (including both sides of a trade) without a second phone.
+  demoMode: boolean;
   winnerId: string | null;
   log: string[];
 }
@@ -156,4 +172,9 @@ export type ClientAction =
   | { type: "requestResource"; resource: ResourceType }
   | { type: "cancelResourceRequest" }
   | { type: "offerQuickTrade"; wantInReturn: ResourceType }
+  | { type: "startNegotiation"; withPlayerId: string }
+  | { type: "respondNegotiation"; accept: boolean }
+  | { type: "changeNegotiationOffer"; resource: ResourceType; delta: 1 | -1 }
+  | { type: "setNegotiationConfirmed"; confirmed: boolean }
+  | { type: "cancelNegotiation" }
   | { type: "endTurn" };

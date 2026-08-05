@@ -42,6 +42,19 @@ export function Lobby() {
       >
         Raum beitreten
       </button>
+
+      <div className="divider">oder</div>
+
+      <button
+        className="demo-button"
+        onClick={() => socket.emit("createDemoRoom", { playerNames: ["Rot", "Grün", "Orange"] })}
+      >
+        🎮 Demo starten (allein testen)
+      </button>
+      <p className="hint">
+        Im Demo-Modus steuerst du alle drei Spieler von diesem Gerät — praktisch, um das Spiel ohne
+        Mitspieler auszuprobieren.
+      </p>
     </div>
   );
 }

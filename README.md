@@ -52,12 +52,32 @@ Gekauft für 1 Erz + 1 Weizen + 1 Wolle, gespielt aus der eigenen (verdeckten) H
   spezialisierten Hafen (sobald eine eigene Siedlung/Stadt den Hafen berührt).
 - **Spieler-Handel**: ein Spieler bietet einem anderen ein Tauschgeschäft an (frei wählbare
   Rohstoffmengen in beide Richtungen); der Zielspieler nimmt an oder lehnt ab.
+- **Verhandlungstisch (großer Handel)**: Tipp auf den Namen eines Mitspielers → "Traden".
+  Nimmt er an, öffnet sich bei beiden ein gemeinsamer Tisch: jeder tippt seine eigenen
+  Rohstoffe an, um sie darauf zu legen (und nochmal, um sie zurückzunehmen). Beide sehen
+  live, was drauf liegt. Erst wenn **beide** bestätigt haben, wird getauscht — und **jede**
+  Änderung am Tisch setzt beide Bestätigungen zurück, damit niemand den Deal nachträglich
+  zu seinen Gunsten verändern kann.
 - **Schnell-Handel ("Ich brauche X")**: Doppeltipp auf eine Ressource in der eigenen Leiste
   ruft in die Runde, dass man sie sucht. Nur Mitspieler, die diesen Rohstoff tatsächlich
   besitzen, sehen die Anfrage und wählen mit einem Tipp aus, was sie im Gegenzug wollen —
   daraus wird ein 1:1-Angebot, das der Fragende annimmt oder ablehnt. Bewusst **nicht** auf
   den aktiven Spieler beschränkt: der Rundruf soll auch funktionieren, während man auf
   seinen Zug wartet.
+
+## Demo-Modus (allein testen)
+
+Der Button **"🎮 Demo starten"** in der Lobby erstellt einen Raum mit drei Spielern, die alle
+von diesem einen Gerät gesteuert werden — praktisch, um das Spiel ohne Mitspieler
+auszuprobieren. Oben erscheint eine Leiste, über die man zwischen den Sitzplätzen wechselt;
+beim Zugwechsel springt sie automatisch auf den Spieler, der dran ist (ein manueller Wechsel
+bleibt bis zum nächsten Zugwechsel bestehen, damit man z.B. beide Seiten eines Handels
+bedienen kann). Die Leiste liegt bewusst über dem Verhandlungstisch, sodass man auch mitten
+im Handel die Seite wechseln kann.
+
+Serverseitig darf nur eine Verbindung in einem als `demoMode` markierten Raum Aktionen im
+Namen beliebiger Spieler senden; in normalen Räumen zählt weiterhin ausschließlich die
+bestätigte eigene Identität der Verbindung.
 
 ## Längste Straße & Größte Rittermacht
 

@@ -75,6 +75,8 @@ export function createLobby(roomId: string): GameState {
     largestArmyPlayerId: null,
     pendingTrade: null,
     resourceRequest: null,
+    negotiation: null,
+    demoMode: false,
     winnerId: null,
     log: [],
   };
@@ -95,6 +97,17 @@ export function addPlayer(state: GameState, playerId: string, name: string): Gam
     turnOrderRoll: null,
   };
   return { ...state, players: [...state.players, player], log: [...state.log, `${name} ist beigetreten.`] };
+}
+
+// Builds a room that a single device drives on behalf of every player, for
+// solo testing. Marked on the state so the server knows to accept actions
+// from this one connection on any player's behalf.
+export function createDemoLobby(roomId: string, playerNames: string[]): GameState {
+  let state: GameState = { ...createLobby(roomId), demoMode: true };
+  for (const [i, name] of playerNames.entries()) {
+    state = addPlayer(state, `${roomId}-demo-${i}`, name);
+  }
+  return { ...state, log: [...state.log, "Demo-Modus: Du steuerst alle Spieler von diesem Gerät."] };
 }
 
 export function removePlayer(state: GameState, playerId: string): GameState {
@@ -722,6 +735,116 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         pendingTrade: offer,
         log: [...state.log, `${responder.name} bietet ${asker.name} 1x ${TERRAIN_NAMES_DE[request.resource]} für 1x ${TERRAIN_NAMES_DE[action.wantInReturn]}.`],
       };
+    }
+
+    case "startNegotiation": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      if (state.negotiation) throw new GameError("Es läuft bereits eine Verhandlung.");
+      if (action.withPlayerId === playerId) throw new GameError("Du kannst nicht mit dir selbst handeln.");
+      const initiator = state.players.find((p) => p.id === playerId);
+      const partner = state.players.find((p) => p.id === action.withPlayerId);
+      if (!initiator || !partner) throw new GameError("Spieler nicht gefunden.");
+      return {
+        ...state,
+        negotiation: {
+          id: `${Date.now()}-${playerId}`,
+          initiatorId: playerId,
+          partnerId: action.withPlayerId,
+          status: "pending",
+          offers: { [playerId]: {}, [action.withPlayerId]: {} },
+          confirmed: { [playerId]: false, [action.withPlayerId]: false },
+        },
+        log: [...state.log, `${initiator.name} möchte mit ${partner.name} handeln.`],
+      };
+    }
+
+    case "respondNegotiation": {
+      const negotiation = state.negotiation;
+      if (!negotiation) throw new GameError("Es gibt keine offene Handelsanfrage.");
+      if (negotiation.status !== "pending") throw new GameError("Die Verhandlung läuft bereits.");
+      if (negotiation.partnerId !== playerId) throw new GameError("Diese Anfrage richtet sich nicht an dich.");
+      if (!action.accept) {
+        return { ...state, negotiation: null, log: [...state.log, "Handelsanfrage abgelehnt."] };
+      }
+      return { ...state, negotiation: { ...negotiation, status: "open" } };
+    }
+
+    case "changeNegotiationOffer": {
+      const negotiation = state.negotiation;
+      if (!negotiation || negotiation.status !== "open") throw new GameError("Kein offener Verhandlungstisch.");
+      if (playerId !== negotiation.initiatorId && playerId !== negotiation.partnerId)
+        throw new GameError("Du bist nicht Teil dieser Verhandlung.");
+      const player = state.players.find((p) => p.id === playerId);
+      if (!player) throw new GameError("Spieler nicht gefunden.");
+
+      const mine = { ...(negotiation.offers[playerId] ?? {}) };
+      const current = mine[action.resource] ?? 0;
+      const next = current + action.delta;
+      if (next < 0) throw new GameError("Da liegt nichts mehr auf dem Tisch.");
+      if (next > player.resources[action.resource]) throw new GameError("So viel hast du nicht.");
+      if (next === 0) delete mine[action.resource];
+      else mine[action.resource] = next;
+
+      return {
+        ...state,
+        negotiation: {
+          ...negotiation,
+          offers: { ...negotiation.offers, [playerId]: mine },
+          // Any change invalidates prior agreement on both sides.
+          confirmed: { [negotiation.initiatorId]: false, [negotiation.partnerId]: false },
+        },
+      };
+    }
+
+    case "setNegotiationConfirmed": {
+      const negotiation = state.negotiation;
+      if (!negotiation || negotiation.status !== "open") throw new GameError("Kein offener Verhandlungstisch.");
+      if (playerId !== negotiation.initiatorId && playerId !== negotiation.partnerId)
+        throw new GameError("Du bist nicht Teil dieser Verhandlung.");
+
+      const confirmed = { ...negotiation.confirmed, [playerId]: action.confirmed };
+      if (!(confirmed[negotiation.initiatorId] && confirmed[negotiation.partnerId])) {
+        return { ...state, negotiation: { ...negotiation, confirmed } };
+      }
+
+      // Both sides agreed — settle the deal.
+      const initiator = state.players.find((p) => p.id === negotiation.initiatorId);
+      const partner = state.players.find((p) => p.id === negotiation.partnerId);
+      if (!initiator || !partner) throw new GameError("Handelspartner nicht mehr im Spiel.");
+      const initiatorOffer = negotiation.offers[negotiation.initiatorId] ?? {};
+      const partnerOffer = negotiation.offers[negotiation.partnerId] ?? {};
+      if (!hasEnoughResources(initiator, initiatorOffer) || !hasEnoughResources(partner, partnerOffer)) {
+        return { ...state, negotiation: null, log: [...state.log, "Handel geplatzt — Rohstoffe haben sich geändert."] };
+      }
+      const nothingOffered =
+        RESOURCE_TYPES.every((r) => !(initiatorOffer[r] ?? 0)) && RESOURCE_TYPES.every((r) => !(partnerOffer[r] ?? 0));
+      if (nothingOffered) throw new GameError("Es liegt nichts auf dem Tisch.");
+
+      let next = updatePlayer(state, negotiation.initiatorId, (p) => payCost(p, initiatorOffer));
+      next = updatePlayer(next, negotiation.partnerId, (p) => payCost(p, partnerOffer));
+      next = updatePlayer(next, negotiation.initiatorId, (p) => {
+        const resources = { ...p.resources };
+        for (const r of RESOURCE_TYPES) resources[r] += partnerOffer[r] ?? 0;
+        return { ...p, resources };
+      });
+      next = updatePlayer(next, negotiation.partnerId, (p) => {
+        const resources = { ...p.resources };
+        for (const r of RESOURCE_TYPES) resources[r] += initiatorOffer[r] ?? 0;
+        return { ...p, resources };
+      });
+      return {
+        ...next,
+        negotiation: null,
+        log: [...next.log, `${initiator.name} und ${partner.name} haben am Verhandlungstisch abgeschlossen.`],
+      };
+    }
+
+    case "cancelNegotiation": {
+      const negotiation = state.negotiation;
+      if (!negotiation) return state;
+      if (playerId !== negotiation.initiatorId && playerId !== negotiation.partnerId)
+        throw new GameError("Du bist nicht Teil dieser Verhandlung.");
+      return { ...state, negotiation: null, log: [...state.log, "Verhandlung abgebrochen."] };
     }
 
     case "endTurn": {

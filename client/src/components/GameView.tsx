@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio } from "@canos/shared";
 import { HexBoard, BuildMode } from "./HexBoard";
+import { NegotiationTable } from "./NegotiationTable";
 
 interface Props {
   state: GameState;
@@ -48,6 +49,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [confirmingBuyCard, setConfirmingBuyCard] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logExpanded, setLogExpanded] = useState(false);
+  const [playerMenuId, setPlayerMenuId] = useState<string | null>(null);
 
   const me = state.players.find((p) => p.id === myPlayerId);
   const currentPlayerId = state.turnOrder[state.currentPlayerIndex];
@@ -154,6 +156,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
   return (
     <div className="game-root">
+      <NegotiationTable state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
       {turnPopup && (
         <div className="turn-popup">
           <span>{turnPopup}</span>
@@ -217,12 +220,31 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       <div className="sidebar">
         <div className="player-cards">
           {state.players.map((p) => (
-            <div key={p.id} className={`player-card ${p.id === currentPlayerId ? "active" : ""}`} style={{ borderColor: p.color }}>
-              <span className="player-dot" style={{ background: p.color }} />
-              <span className="player-name">{p.name}</span>
-              {state.longestRoadPlayerId === p.id && <span className="badge" title="Längste Straße">🛣️</span>}
-              {state.largestArmyPlayerId === p.id && <span className="badge" title="Größte Rittermacht">⚔️</span>}
-              {!p.connected && <span className="offline-badge">offline</span>}
+            <div key={p.id} className="player-card-wrap">
+              <button
+                className={`player-card ${p.id === currentPlayerId ? "active" : ""}`}
+                style={{ borderColor: p.color }}
+                onClick={() => setPlayerMenuId(playerMenuId === p.id ? null : p.id)}
+              >
+                <span className="player-dot" style={{ background: p.color }} />
+                <span className="player-name">{p.name}</span>
+                {state.longestRoadPlayerId === p.id && <span className="badge" title="Längste Straße">🛣️</span>}
+                {state.largestArmyPlayerId === p.id && <span className="badge" title="Größte Rittermacht">⚔️</span>}
+                {!p.connected && <span className="offline-badge">offline</span>}
+              </button>
+              {playerMenuId === p.id && p.id !== myPlayerId && (
+                <div className="player-menu">
+                  <button
+                    disabled={!!state.negotiation}
+                    onClick={() => {
+                      sendAction({ type: "startNegotiation", withPlayerId: p.id });
+                      setPlayerMenuId(null);
+                    }}
+                  >
+                    🤝 Traden
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -20,24 +20,52 @@ mit verdeckten Feldern, einer prozeduralen Insel und drei Räuber-Varianten.
 
 ## Die drei Räuber
 
-1. **Klassischer Räuber** 🥷 — wie im Original: wird bei einer gewürfelten 7 vom aktiven
-   Spieler auf ein neues Feld gesetzt und blockiert dessen Ernte komplett.
-2. **Bestochener Räuber** 💰 — ein zweiter, verdeckter "Wildcard"-Räuber sitzt von Anfang an
-   irgendwo auf der Insel. Wird sein Feld enthüllt, leitet er ab sofort jede Ernte dieses
-   Feldes an einen zufällig bestimmten anderen Spieler um ("er wurde bestochen").
-3. **Boost-Räuber** ✨ — die andere mögliche Ausprägung desselben Wildcard-Tokens: verdoppelt
-   dauerhaft die Ernte auf seinem Feld für dessen Besitzer.
+1. **Klassischer Räuber** 🥷 — wie im Original: an die gewürfelte 7 gekoppelt. Der aktive
+   Spieler setzt ihn auf ein neues Feld, das dadurch komplett blockiert wird.
+2. **Boost-Figur** ✨ — eine zweite, feste Figur, die verdeckt (wie ein normales Feld) irgendwo
+   auf der Insel steht. Wird ihr Feld enthüllt, verdoppelt sie dessen Ernte dauerhaft für den
+   Besitzer — ein Segen ohne Karteneinsatz, einfach Glückssache, wo sie liegt.
+3. **Bestochener Räuber** 💰 — eine Entwicklungskarte (siehe unten), die ein Spieler aktiv auf
+   ein beliebiges aufgedecktes Feld legt. Ab dann wandert dessen gesamte Ernte zu ihm, bis
+   entweder jemand die Karte erneut spielt (verschiebt die Bestechung) oder eine 7 gewürfelt
+   wird — die 7 deckt die Bestechung auf und hebt den Effekt sofort auf. Weil sie komplett
+   unabhängig vom Würfeln ausgelöst wird, kann sie gezielt eingesetzt werden, ohne durch die
+   nächste 7 sofort wieder kassiert zu werden — bleibt aber durch das 7er-Risiko trotzdem
+   ein Wagnis statt eines Garantie-Bonus.
 
-Welche der beiden Wildcard-Varianten (Bestochen/Boost) auf der Karte liegt, wird zufällig
-beim Kartengenerieren festgelegt und bleibt bis zur Aufdeckung geheim — niemand weiß vorher,
-ob ein bestimmtes Feld ein Fluch oder ein Segen ist.
+## Entwicklungskarten
+
+Gekauft für 1 Erz + 1 Weizen + 1 Wolle, gespielt aus der eigenen (verdeckten) Hand:
+
+- **Ritter** ⚔️ — bewegt den klassischen Räuber sofort (auch ohne 7) und stiehlt eine
+  zufällige Rohstoffkarte von einem Gegner am neuen Räuberfeld. Wer die meisten Ritter
+  spielt (mind. 3), erhält die **Größte Rittermacht** (+2 Siegpunkte).
+- **Straßenbau** 🛤️ — baut sofort 2 kostenlose Straßen.
+- **Erfindung** 💡 — nimmt sich 2 beliebige Rohstoffe aus der Bank.
+- **Monopol** 📈 — ein Rohstoff wird gewählt; alle anderen Spieler geben ihren gesamten
+  Bestand dieses Rohstoffs ab.
+- **Bestochener Räuber** 💰 — siehe oben.
+
+## Handel
+
+- **Bankhandel**: 4:1 ohne Hafen, 3:1 über einen "Beliebig"-Hafen, 2:1 über einen
+  spezialisierten Hafen (sobald eine eigene Siedlung/Stadt den Hafen berührt).
+- **Spieler-Handel**: ein Spieler bietet einem anderen ein Tauschgeschäft an (frei wählbare
+  Rohstoffmengen in beide Richtungen); der Zielspieler nimmt an oder lehnt ab.
+
+## Längste Straße & Größte Rittermacht
+
+Wie im Original: die längste zusammenhängende Straße (mind. 5 Felder) bringt +2 Siegpunkte,
+die größte Rittermacht (mind. 3 gespielte Ritter) ebenfalls +2. Beide Boni werden bei jeder
+relevanten Aktion neu berechnet und können den Besitzer wechseln.
 
 ## Weitere Ideen für spätere Ausbaustufen (aus dem Brainstorming, noch nicht umgesetzt)
 
 - Wetter-Events (Sturm blockiert temporär ein Feld, Dürre halbiert eine Ressource)
 - Anonyme Spenden-/Verrat-Mechanik in den Bankpool
 - Asynchrone Zeitfenster pro Zug mit Auto-Skip
-- Handel zwischen Spielern, Entwicklungskarten, Längste-Straße/Größte-Rittermacht-Wertung
+- Verdeckte Handkarten gegenüber anderen Spielern (aktuell sind Rohstoffmengen und
+  Kartenhände für alle sichtbar — eine bewusste MVP-Vereinfachung, siehe unten)
 
 ## Architektur
 

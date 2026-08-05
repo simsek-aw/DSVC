@@ -303,6 +303,119 @@ body {
   padding-top: 8px;
 }
 
+.mode-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(244, 162, 97, 0.9);
+  color: #111;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.badge {
+  font-size: 0.9rem;
+}
+
+.primary-button.small, button.small {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.card-panel, .trade-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #142c30;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.card-panel h4, .trade-panel h4 {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #a8dadc;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.card-row button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #2a4a4f;
+  background: #1d3a3f;
+  color: #fff;
+  cursor: pointer;
+}
+
+.inline-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.inline-picker select, .inline-picker button {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #2a4a4f;
+  background: #1d3a3f;
+  color: #fff;
+}
+
+.resource-count-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.editor-label {
+  width: 100%;
+  color: #a8dadc;
+}
+
+.count-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.count-field input {
+  width: 44px;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid #2a4a4f;
+  background: #10242a;
+  color: #fff;
+  text-align: center;
+}
+
+.trade-offer-banner {
+  background: #2a1d3f;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
 .toast-error {
   position: fixed;
   top: 10px;

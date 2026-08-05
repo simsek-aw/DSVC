@@ -15,13 +15,15 @@ import {
   vertexKey,
 } from "@canos/shared";
 
-export type BuildMode = null | "road" | "settlement" | "city" | "robber";
+export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding";
 
 interface Props {
   state: GameState;
   myPlayerId: string;
   buildMode: BuildMode;
   sendAction: (action: any) => void;
+  freeRoadEdges?: EdgeId[];
+  onSelectFreeRoadEdge?: (edge: EdgeId) => void;
 }
 
 const TERRAIN_COLORS: Record<string, string> = {
@@ -39,7 +41,7 @@ function tilePolygonPoints(center: { x: number; y: number }, size: number): stri
     .join(" ");
 }
 
-export function HexBoard({ state, myPlayerId, buildMode, sendAction }: Props) {
+export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdges, onSelectFreeRoadEdge }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ scale: 48, x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; viewX: number; viewY: number } | null>(null);
@@ -93,6 +95,18 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction }: Props) {
   const canAffordSettlement = affordable(state, myPlayerId, "settlement");
   const canAffordCity = affordable(state, myPlayerId, "city");
 
+  const awaitingRobberMove = state.lastDiceRoll?.total === 7 && !state.robberTileCoord;
+
+  const handleTileClick = (tile: Tile) => {
+    if (awaitingRobberMove) {
+      sendAction({ type: "moveClassicRobber", coord: tile.coord });
+    } else if (buildMode === "knight") {
+      sendAction({ type: "playKnight", coord: tile.coord });
+    } else if (buildMode === "bribery" && tile.revealed) {
+      sendAction({ type: "playBribery", coord: tile.coord });
+    }
+  };
+
   return (
     <svg
       ref={svgRef}
@@ -109,24 +123,25 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction }: Props) {
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
         {state.tiles.map((tile) => {
           const center = px(tile.coord);
+          const isBribed = state.briberyTileCoord && axialKey(state.briberyTileCoord) === axialKey(tile.coord);
           return (
             <TilePiece
               key={axialKey(tile.coord)}
               tile={tile}
               center={center}
               size={view.scale}
-              onClickTile={() => {
-                if (buildMode === "robber") sendAction({ type: "moveClassicRobber", coord: tile.coord });
-              }}
+              isBribed={!!isBribed}
+              onClickTile={() => handleTileClick(tile)}
             />
           );
         })}
 
-        {(buildMode === "road" || buildMode === "settlement") &&
+        {(buildMode === "road" || buildMode === "roadBuilding") &&
           Array.from(graph.edges.values()).map((edge) => {
             const occupied = state.roads.some((r) => edgeKey(r.edge) === edgeKey(edge));
-            if (occupied) return null;
-            if (buildMode !== "road" || !canAffordRoad) return null;
+            const alreadySelected = freeRoadEdges?.some((e) => edgeKey(e) === edgeKey(edge));
+            if (occupied || alreadySelected) return null;
+            if (buildMode === "road" && !canAffordRoad) return null;
             const a = scalePoint(edge.a, view.scale);
             const b = scalePoint(edge.b, view.scale);
             return (
@@ -137,10 +152,28 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction }: Props) {
                 x2={b.x}
                 y2={b.y}
                 className="edge-hitbox"
-                onClick={() => sendAction({ type: "buildRoad", edge })}
+                onClick={() => (buildMode === "roadBuilding" ? onSelectFreeRoadEdge?.(edge) : sendAction({ type: "buildRoad", edge }))}
               />
             );
           })}
+
+        {freeRoadEdges?.map((edge) => {
+          const a = scalePoint(edge.a, view.scale);
+          const b = scalePoint(edge.b, view.scale);
+          return (
+            <line
+              key={`pending-${edgeKey(edge)}`}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              stroke="#f4a261"
+              strokeWidth={Math.max(3, view.scale * 0.08)}
+              strokeDasharray="4 4"
+              strokeLinecap="round"
+            />
+          );
+        })}
 
         {Array.from(graph.vertices.values()).map((v) => {
           const vk = vertexKey(v);
@@ -148,10 +181,11 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction }: Props) {
           const p = scalePoint(v, view.scale);
           const owner = building && state.players.find((pl) => pl.id === building.ownerId);
 
+          const isMyTurn = state.turnOrder[state.currentPlayerIndex] === myPlayerId;
           const clickable =
             (buildMode === "settlement" && !building && canAffordSettlement) ||
             (buildMode === "city" && building?.ownerId === myPlayerId && building.type === "settlement" && canAffordCity) ||
-            (state.phase === "setup" && !building);
+            (state.phase === "setup" && !building && isMyTurn && !state.setupStepAwaitingRoad);
 
           return (
             <g key={vk}>
@@ -189,9 +223,18 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction }: Props) {
         })}
 
         {state.phase === "setup" &&
+          state.setupStepAwaitingRoad &&
+          state.turnOrder[state.currentPlayerIndex] === myPlayerId &&
           Array.from(graph.edges.values()).map((edge) => {
             const occupied = state.roads.some((r) => edgeKey(r.edge) === edgeKey(edge));
-            if (occupied || !state.setupStepAwaitingRoad) return null;
+            if (occupied) return null;
+            // Only edges touching the settlement just placed are legal during setup —
+            // filtering here avoids letting players click a road the server will reject anyway.
+            const lastOwnSettlement = [...state.buildings].reverse().find((b) => b.ownerId === myPlayerId);
+            if (!lastOwnSettlement) return null;
+            const touchesLast =
+              vertexKey(edge.a) === vertexKey(lastOwnSettlement.vertex) || vertexKey(edge.b) === vertexKey(lastOwnSettlement.vertex);
+            if (!touchesLast) return null;
             const a = scalePoint(edge.a, view.scale);
             const b = scalePoint(edge.b, view.scale);
             return (
@@ -244,11 +287,13 @@ function TilePiece({
   tile,
   center,
   size,
+  isBribed,
   onClickTile,
 }: {
   tile: Tile;
   center: { x: number; y: number };
   size: number;
+  isBribed: boolean;
   onClickTile: () => void;
 }) {
   const points = tilePolygonPoints(center, size * 0.97);
@@ -276,10 +321,16 @@ function TilePiece({
           🥷
         </text>
       )}
-      {tile.revealed && tile.modifierRobber && (
+      {tile.revealed && tile.hasBoostToken && (
         <text x={center.x} y={center.y - size * 0.5} textAnchor="middle" className="robber-glyph">
-          <title>{tile.modifierRobber.variant}</title>
-          {tile.modifierRobber.variant === "corrupt" ? "💰" : "✨"}
+          <title>Boost-Figur</title>
+          ✨
+        </text>
+      )}
+      {isBribed && (
+        <text x={center.x + size * 0.4} y={center.y - size * 0.5} textAnchor="middle" className="robber-glyph">
+          <title>Bestochen</title>
+          💰
         </text>
       )}
       {tile.revealed && tile.port && (

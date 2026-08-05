@@ -1,5 +1,5 @@
 import { AxialCoord, axialKey, axialNeighbors, tileEdges } from "./hexGrid";
-import { PortInfo, ResourceType, RobberModifier, RobberVariant, Tile } from "./types";
+import { ResourceType, Tile } from "./types";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -105,12 +105,6 @@ function numberTokenPool(landTileCount: number): number[] {
   return shuffle(pool);
 }
 
-function pickModifierVariant(): RobberVariant {
-  // 'classic' is excluded here — this pool only decides the *wildcard* token's flavor.
-  const options: RobberVariant[] = ["corrupt", "boon"];
-  return options[Math.floor(Math.random() * options.length)];
-}
-
 export interface MapGenOptions {
   playerCount: number;
   tileSize?: number;
@@ -141,7 +135,7 @@ export function generateMap(options: MapGenOptions): GeneratedMap {
       revealed: false,
       numberRevealed: false,
       hasClassicRobber: terrain === "desert",
-      modifierRobber: null,
+      hasBoostToken: false,
       port: null,
     };
   });
@@ -151,11 +145,11 @@ export function generateMap(options: MapGenOptions): GeneratedMap {
     tiles[Math.floor(Math.random() * tiles.length)].hasClassicRobber = true;
   }
 
-  // Place the single wildcard "modifier" robber on a random non-desert, non-classic tile.
-  const candidatesForModifier = tiles.filter((t) => !t.hasClassicRobber && t.terrain !== "desert");
-  if (candidatesForModifier.length > 0) {
-    const modifierTile = candidatesForModifier[Math.floor(Math.random() * candidatesForModifier.length)];
-    modifierTile.modifierRobber = { variant: pickModifierVariant() };
+  // Place the single, fixed Boost figure on a random non-desert, non-classic-robber tile.
+  // It stays hidden (like the tile beneath it) until a settlement reveals it.
+  const candidatesForBoost = tiles.filter((t) => !t.hasClassicRobber && t.terrain !== "desert");
+  if (candidatesForBoost.length > 0) {
+    candidatesForBoost[Math.floor(Math.random() * candidatesForBoost.length)].hasBoostToken = true;
   }
 
   // Ports: find coastline tiles (fewer than 6 neighbors placed) and scatter a handful of ports on them.

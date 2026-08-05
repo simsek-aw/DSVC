@@ -18,22 +18,42 @@ export { buildBoardGraph, tilesTouchingVertex, vertexNeighborsOf } from "./board
 export type {
   ResourceType,
   TerrainType,
-  RobberVariant,
-  RobberModifier,
   Tile,
   PortInfo,
   BuildingType,
   Building,
   Road,
+  DevelopmentCardType,
   Player,
   GamePhase,
   DiceRoll,
+  TradeOffer,
   GameState,
   ClientAction,
 } from "./types";
-export { RESOURCE_TYPES, BUILD_COSTS, VICTORY_POINTS_TO_WIN } from "./types";
+export {
+  RESOURCE_TYPES,
+  BUILD_COSTS,
+  VICTORY_POINTS_TO_WIN,
+  LONGEST_ROAD_MIN_LENGTH,
+  LARGEST_ARMY_MIN_KNIGHTS,
+  LONGEST_ROAD_BONUS,
+  LARGEST_ARMY_BONUS,
+} from "./types";
 
 export type { MapGenOptions, GeneratedMap } from "./mapGenerator";
 export { generateMap } from "./mapGenerator";
 
-export { TILE_SIZE, GameError, createLobby, addPlayer, setPlayerConnected, startGame, applyAction } from "./gameEngine";
+export { longestRoadLength } from "./longestRoad";
+
+export {
+  TILE_SIZE,
+  GameError,
+  createLobby,
+  addPlayer,
+  setPlayerConnected,
+  startGame,
+  applyAction,
+  totalVictoryPoints,
+  bestBankRatio,
+} from "./gameEngine";

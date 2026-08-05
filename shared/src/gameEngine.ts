@@ -1,12 +1,18 @@
 import { buildBoardGraph, tilesTouchingVertex, vertexNeighborsOf } from "./boardGraph";
-import { AxialCoord, axialKey, edgeKey, vertexKey } from "./hexGrid";
+import { AxialCoord, EdgeId, axialKey, edgeKey, vertexKey } from "./hexGrid";
+import { longestRoadLength } from "./longestRoad";
 import { generateMap } from "./mapGenerator";
 import {
   BUILD_COSTS,
   Building,
   ClientAction,
+  DevelopmentCardType,
   DiceRoll,
   GameState,
+  LARGEST_ARMY_BONUS,
+  LARGEST_ARMY_MIN_KNIGHTS,
+  LONGEST_ROAD_BONUS,
+  LONGEST_ROAD_MIN_LENGTH,
   Player,
   ResourceType,
   RESOURCE_TYPES,
@@ -25,6 +31,28 @@ function emptyResources(): Record<ResourceType, number> {
 
 const PLAYER_COLORS = ["#e63946", "#2a9d8f", "#f4a261", "#457b9d", "#8338ec", "#ffb703"];
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildDevelopmentDeck(): DevelopmentCardType[] {
+  const composition: [DevelopmentCardType, number][] = [
+    ["knight", 10],
+    ["roadBuilding", 3],
+    ["invention", 3],
+    ["monopoly", 3],
+    ["bribery", 3],
+  ];
+  const deck: DevelopmentCardType[] = [];
+  for (const [type, count] of composition) for (let i = 0; i < count; i++) deck.push(type);
+  return shuffle(deck);
+}
+
 export function createLobby(roomId: string): GameState {
   return {
     roomId,
@@ -39,7 +67,12 @@ export function createLobby(roomId: string): GameState {
     roads: [],
     lastDiceRoll: null,
     robberTileCoord: null,
-    modifierRobberTileCoord: null,
+    developmentDeck: [],
+    briberyTileCoord: null,
+    briberyBeneficiaryId: null,
+    longestRoadPlayerId: null,
+    largestArmyPlayerId: null,
+    pendingTrade: null,
     winnerId: null,
     log: [],
   };
@@ -54,6 +87,8 @@ export function addPlayer(state: GameState, playerId: string, name: string): Gam
     color: PLAYER_COLORS[state.players.length % PLAYER_COLORS.length],
     connected: true,
     resources: emptyResources(),
+    developmentCards: [],
+    knightsPlayed: 0,
     victoryPoints: 0,
     turnOrderRoll: null,
   };
@@ -112,6 +147,7 @@ export function startGame(state: GameState): GameState {
     ...state,
     phase: "turnOrderRoll",
     tiles,
+    developmentDeck: buildDevelopmentDeck(),
     log: [...state.log, "Spiel gestartet. Alle würfeln um die Zugreihenfolge."],
   };
 }
@@ -130,6 +166,13 @@ function revealAllNumbers(state: GameState): GameState {
   return { ...state, tiles: state.tiles.map((t) => ({ ...t, numberRevealed: true })) };
 }
 
+function producersForTile(state: GameState, tile: Tile): Building[] {
+  const graph = buildBoardGraph(state.tiles, TILE_SIZE);
+  return state.buildings.filter((b) =>
+    graph.vertexTiles.get(vertexKey(b.vertex))?.some((c) => axialKey(c) === axialKey(tile.coord))
+  );
+}
+
 function produceResources(state: GameState, total: number): GameState {
   let next = state;
   for (const tile of state.tiles) {
@@ -137,22 +180,13 @@ function produceResources(state: GameState, total: number): GameState {
     if (tile.hasClassicRobber) continue;
     if (tile.terrain === "desert") continue;
     const resource = tile.terrain as ResourceType;
-    const producers = state.buildings.filter((b) =>
-      buildBoardGraph(state.tiles, TILE_SIZE)
-        .vertexTiles.get(vertexKey(b.vertex))
-        ?.some((c) => axialKey(c) === axialKey(tile.coord))
-    );
-    for (const b of producers) {
-      const amount = b.type === "city" ? 2 : 1;
-      let recipientId = b.ownerId;
-      let finalAmount = amount;
-      if (tile.modifierRobber?.variant === "corrupt" && tile.modifierRobber.beneficiaryPlayerId) {
-        recipientId = tile.modifierRobber.beneficiaryPlayerId;
-        next = { ...next, log: [...next.log, `Bestochener Räuber leitet die Ernte auf einem ${resource}-Feld um!`] };
-      } else if (tile.modifierRobber?.variant === "boon") {
-        finalAmount = amount * 2;
-        next = { ...next, log: [...next.log, `Boost-Räuber verdoppelt die Ernte auf einem ${resource}-Feld!`] };
-      }
+    const isBribed = next.briberyTileCoord && axialKey(next.briberyTileCoord) === axialKey(tile.coord);
+    for (const b of producersForTile(next, tile)) {
+      const baseAmount = b.type === "city" ? 2 : 1;
+      const finalAmount = tile.hasBoostToken ? baseAmount * 2 : baseAmount;
+      const recipientId = isBribed && next.briberyBeneficiaryId ? next.briberyBeneficiaryId : b.ownerId;
+      if (isBribed) next = { ...next, log: [...next.log, `Bestochener Räuber leitet die Ernte auf einem ${resource}-Feld um!`] };
+      if (tile.hasBoostToken) next = { ...next, log: [...next.log, `Boost-Figur verdoppelt die Ernte auf einem ${resource}-Feld!`] };
       next = updatePlayer(next, recipientId, (p) => ({
         ...p,
         resources: { ...p.resources, [resource]: p.resources[resource] + finalAmount },
@@ -162,8 +196,59 @@ function produceResources(state: GameState, total: number): GameState {
   return next;
 }
 
+export function totalVictoryPoints(state: GameState, playerId: string): number {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return 0;
+  let total = player.victoryPoints;
+  if (state.longestRoadPlayerId === playerId) total += LONGEST_ROAD_BONUS;
+  if (state.largestArmyPlayerId === playerId) total += LARGEST_ARMY_BONUS;
+  return total;
+}
+
+function recomputeLongestRoad(state: GameState): GameState {
+  const lengths = state.players.map((p) => ({ id: p.id, len: longestRoadLength(state.roads, p.id) }));
+  const currentHolderLen = state.longestRoadPlayerId
+    ? lengths.find((l) => l.id === state.longestRoadPlayerId)?.len ?? 0
+    : 0;
+  const best = lengths.reduce((max, l) => (l.len > max.len ? l : max), { id: null as string | null, len: 0 });
+
+  if (best.len < LONGEST_ROAD_MIN_LENGTH) {
+    if (state.longestRoadPlayerId === null) return state;
+    return { ...state, longestRoadPlayerId: null };
+  }
+  if (best.len <= currentHolderLen) return state; // holder keeps ties
+  const winner = state.players.find((p) => p.id === best.id);
+  return {
+    ...state,
+    longestRoadPlayerId: best.id,
+    log: [...state.log, `${winner?.name} übernimmt die Längste Straße (${best.len} Felder)!`],
+  };
+}
+
+function recomputeLargestArmy(state: GameState): GameState {
+  const currentHolderKnights = state.largestArmyPlayerId
+    ? state.players.find((p) => p.id === state.largestArmyPlayerId)?.knightsPlayed ?? 0
+    : 0;
+  const best = state.players.reduce(
+    (max, p) => (p.knightsPlayed > max.knightsPlayed ? p : max),
+    { id: null as string | null, knightsPlayed: 0 } as { id: string | null; knightsPlayed: number }
+  );
+
+  if (best.knightsPlayed < LARGEST_ARMY_MIN_KNIGHTS) {
+    if (state.largestArmyPlayerId === null) return state;
+    return { ...state, largestArmyPlayerId: null };
+  }
+  if (best.knightsPlayed <= currentHolderKnights) return state;
+  const winner = state.players.find((p) => p.id === best.id);
+  return {
+    ...state,
+    largestArmyPlayerId: best.id,
+    log: [...state.log, `${winner?.name} übernimmt die Größte Rittermacht (${best.knightsPlayed} Ritter)!`],
+  };
+}
+
 function checkVictory(state: GameState): GameState {
-  const winner = state.players.find((p) => p.victoryPoints >= VICTORY_POINTS_TO_WIN);
+  const winner = state.players.find((p) => totalVictoryPoints(state, p.id) >= VICTORY_POINTS_TO_WIN);
   if (!winner) return state;
   return { ...state, phase: "ended", winnerId: winner.id, log: [...state.log, `${winner.name} hat gewonnen!`] };
 }
@@ -176,6 +261,51 @@ function payCost(player: Player, cost: Partial<Record<ResourceType, number>>): P
   const resources = { ...player.resources };
   for (const r of RESOURCE_TYPES) resources[r] -= cost[r] ?? 0;
   return { ...player, resources };
+}
+
+function roadConnectsToOwnNetwork(state: GameState, playerId: string, edge: EdgeId): boolean {
+  return (
+    state.roads.some(
+      (r) =>
+        r.ownerId === playerId &&
+        (vertexKey(r.edge.a) === vertexKey(edge.a) ||
+          vertexKey(r.edge.a) === vertexKey(edge.b) ||
+          vertexKey(r.edge.b) === vertexKey(edge.a) ||
+          vertexKey(r.edge.b) === vertexKey(edge.b))
+    ) ||
+    state.buildings.some(
+      (b) => b.ownerId === playerId && (vertexKey(b.vertex) === vertexKey(edge.a) || vertexKey(b.vertex) === vertexKey(edge.b))
+    )
+  );
+}
+
+function removeOneCard(player: Player, type: DevelopmentCardType): Player {
+  const idx = player.developmentCards.indexOf(type);
+  if (idx === -1) throw new GameError(`Du hast keine ${type}-Karte.`);
+  const cards = [...player.developmentCards];
+  cards.splice(idx, 1);
+  return { ...player, developmentCards: cards };
+}
+
+function playerPortRatios(state: GameState, playerId: string): { resource: ResourceType | "any"; ratio: 2 | 3 }[] {
+  const ratios: { resource: ResourceType | "any"; ratio: 2 | 3 }[] = [];
+  for (const tile of state.tiles) {
+    if (!tile.port || !tile.revealed) continue;
+    const owned = tile.port.edgeVertices.some((v) =>
+      state.buildings.some((b) => b.ownerId === playerId && vertexKey(b.vertex) === vertexKey(v))
+    );
+    if (owned) ratios.push(tile.port);
+  }
+  return ratios;
+}
+
+export function bestBankRatio(state: GameState, playerId: string, resource: ResourceType): number {
+  let best = 4;
+  for (const p of playerPortRatios(state, playerId)) {
+    if (p.resource === resource) best = Math.min(best, 2);
+    else if (p.resource === "any") best = Math.min(best, 3);
+  }
+  return best;
 }
 
 export function applyAction(state: GameState, playerId: string, action: ClientAction): GameState {
@@ -228,8 +358,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
 
       // Second settlement of setup grants immediate starting resources (classic Catan rule).
       if (state.setupRound === 2) {
-        const touched = tilesTouchingVertex(graph, action.vertex);
-        for (const coord of touched) {
+        for (const coord of tilesTouchingVertex(graph, action.vertex)) {
           const tile = findTile(next, coord);
           if (tile.terrain === "desert") continue;
           const resource = tile.terrain as ResourceType;
@@ -237,38 +366,6 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
             ...p,
             resources: { ...p.resources, [resource]: p.resources[resource] + 1 },
           }));
-        }
-        // Assign a beneficiary for any newly revealed "corrupt" modifier robber tile.
-        for (const coord of touched) {
-          const tile = findTile(next, coord);
-          if (tile.modifierRobber?.variant === "corrupt" && !tile.modifierRobber.beneficiaryPlayerId) {
-            const others = next.players.filter((p) => p.id !== playerId);
-            const beneficiary = others[Math.floor(Math.random() * others.length)] ?? next.players[0];
-            next = {
-              ...next,
-              tiles: next.tiles.map((t) =>
-                axialKey(t.coord) === axialKey(coord)
-                  ? { ...t, modifierRobber: { ...t.modifierRobber!, beneficiaryPlayerId: beneficiary.id } }
-                  : t
-              ),
-            };
-          }
-        }
-      } else {
-        for (const coord of tilesTouchingVertex(graph, action.vertex)) {
-          const tile = findTile(next, coord);
-          if (tile.modifierRobber?.variant === "corrupt" && !tile.modifierRobber.beneficiaryPlayerId) {
-            const others = next.players.filter((p) => p.id !== playerId);
-            const beneficiary = others[Math.floor(Math.random() * others.length)] ?? next.players[0];
-            next = {
-              ...next,
-              tiles: next.tiles.map((t) =>
-                axialKey(t.coord) === axialKey(coord)
-                  ? { ...t, modifierRobber: { ...t.modifierRobber!, beneficiaryPlayerId: beneficiary.id } }
-                  : t
-              ),
-            };
-          }
         }
       }
 
@@ -294,7 +391,13 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       const { index, setupRound, done } = nextIndexSnake(next);
       if (done) {
         next = revealAllNumbers(next);
-        next = { ...next, phase: "mainGame", currentPlayerIndex: 0, setupRound, log: [...next.log, "Aufbauphase beendet — alle Zahlen werden aufgedeckt!"] };
+        next = {
+          ...next,
+          phase: "mainGame",
+          currentPlayerIndex: 0,
+          setupRound,
+          log: [...next.log, "Aufbauphase beendet — alle Zahlen werden aufgedeckt!"],
+        };
       } else {
         next = { ...next, currentPlayerIndex: index, setupRound };
       }
@@ -308,6 +411,9 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       const roll = rollTwoDice();
       let next: GameState = { ...state, lastDiceRoll: roll, log: [...state.log, `${currentPlayer(state).name} würfelt ${roll.total}.`] };
       if (roll.total === 7) {
+        if (next.briberyTileCoord) {
+          next = { ...next, briberyTileCoord: null, briberyBeneficiaryId: null, log: [...next.log, "Die 7 deckt die Bestechung auf — der Effekt ist aufgehoben!"] };
+        }
         next = { ...next, log: [...next.log, "7 gewürfelt! Der klassische Räuber muss bewegt werden."] };
       } else {
         next = produceResources(next, roll.total);
@@ -336,24 +442,13 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       if (!hasEnoughResources(player, BUILD_COSTS.road)) throw new GameError("Nicht genug Rohstoffe für eine Straße.");
       const ek = edgeKey(action.edge);
       if (state.roads.some((r) => edgeKey(r.edge) === ek)) throw new GameError("Straße bereits vorhanden.");
-      const connected =
-        state.roads.some(
-          (r) =>
-            r.ownerId === playerId &&
-            (vertexKey(r.edge.a) === vertexKey(action.edge.a) ||
-              vertexKey(r.edge.a) === vertexKey(action.edge.b) ||
-              vertexKey(r.edge.b) === vertexKey(action.edge.a) ||
-              vertexKey(r.edge.b) === vertexKey(action.edge.b))
-        ) ||
-        state.buildings.some(
-          (b) =>
-            b.ownerId === playerId &&
-            (vertexKey(b.vertex) === vertexKey(action.edge.a) || vertexKey(b.vertex) === vertexKey(action.edge.b))
-        );
-      if (!connected) throw new GameError("Straße muss an dein Straßen- oder Siedlungsnetz anschließen.");
+      if (!roadConnectsToOwnNetwork(state, playerId, action.edge))
+        throw new GameError("Straße muss an dein Straßen- oder Siedlungsnetz anschließen.");
 
       let next = updatePlayer(state, playerId, (p) => payCost(p, BUILD_COSTS.road));
       next = { ...next, roads: [...next.roads, { edge: action.edge, ownerId: playerId }] };
+      next = recomputeLongestRoad(next);
+      next = checkVictory(next);
       return next;
     }
 
@@ -370,9 +465,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       );
       if (tooClose) throw new GameError("Zu nah an einer bestehenden Siedlung (Abstandsregel).");
       const connectedByOwnRoad = state.roads.some(
-        (r) =>
-          r.ownerId === playerId &&
-          (vertexKey(r.edge.a) === vk || vertexKey(r.edge.b) === vk)
+        (r) => r.ownerId === playerId && (vertexKey(r.edge.a) === vk || vertexKey(r.edge.b) === vk)
       );
       if (!connectedByOwnRoad) throw new GameError("Siedlung muss an eine eigene Straße anschließen.");
 
@@ -404,6 +497,170 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       return next;
     }
 
+    case "buyDevelopmentCard": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      const player = currentPlayer(state);
+      if (!hasEnoughResources(player, BUILD_COSTS.developmentCard)) throw new GameError("Nicht genug Rohstoffe für eine Entwicklungskarte.");
+      if (state.developmentDeck.length === 0) throw new GameError("Der Kartenstapel ist leer.");
+      const [card, ...rest] = state.developmentDeck;
+      let next: GameState = { ...state, developmentDeck: rest };
+      next = updatePlayer(next, playerId, (p) => ({ ...payCost(p, BUILD_COSTS.developmentCard), developmentCards: [...p.developmentCards, card] }));
+      next = { ...next, log: [...next.log, `${player.name} kauft eine Entwicklungskarte.`] };
+      return next;
+    }
+
+    case "playKnight": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      const target = findTile(state, action.coord);
+      let next = updatePlayer(state, playerId, (p) => {
+        const withoutCard = removeOneCard(p, "knight");
+        return { ...withoutCard, knightsPlayed: withoutCard.knightsPlayed + 1 };
+      });
+      next = {
+        ...next,
+        tiles: next.tiles.map((t) => ({ ...t, hasClassicRobber: axialKey(t.coord) === axialKey(target.coord) })),
+        log: [...next.log, `${currentPlayer(next).name} spielt einen Ritter und bewegt den Räuber.`],
+      };
+      const victims = producersForTile(next, target).filter((b) => b.ownerId !== playerId);
+      const victimIds = Array.from(new Set(victims.map((b) => b.ownerId)));
+      if (victimIds.length > 0) {
+        const victimId = victimIds[Math.floor(Math.random() * victimIds.length)];
+        const victim = next.players.find((p) => p.id === victimId)!;
+        const available = RESOURCE_TYPES.filter((r) => victim.resources[r] > 0);
+        if (available.length > 0) {
+          const stolen = available[Math.floor(Math.random() * available.length)];
+          next = updatePlayer(next, victimId, (p) => ({ ...p, resources: { ...p.resources, [stolen]: p.resources[stolen] - 1 } }));
+          next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [stolen]: p.resources[stolen] + 1 } }));
+          next = { ...next, log: [...next.log, `${currentPlayer(next).name} stiehlt eine Karte von ${victim.name}.`] };
+        }
+      }
+      next = recomputeLargestArmy(next);
+      next = checkVictory(next);
+      return next;
+    }
+
+    case "playRoadBuilding": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      const [edgeA, edgeB] = action.edges;
+      if (edgeKey(edgeA) === edgeKey(edgeB)) throw new GameError("Zwei unterschiedliche Straßen wählen.");
+      let next = updatePlayer(state, playerId, (p) => removeOneCard(p, "roadBuilding"));
+      for (const edge of [edgeA, edgeB]) {
+        if (next.roads.some((r) => edgeKey(r.edge) === edgeKey(edge))) throw new GameError("Straße bereits vorhanden.");
+        if (!roadConnectsToOwnNetwork(next, playerId, edge)) throw new GameError("Straße muss an dein Netz anschließen.");
+        next = { ...next, roads: [...next.roads, { edge, ownerId: playerId }] };
+      }
+      next = { ...next, log: [...next.log, `${currentPlayer(next).name} baut zwei kostenlose Straßen.`] };
+      next = recomputeLongestRoad(next);
+      next = checkVictory(next);
+      return next;
+    }
+
+    case "playInvention": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      let next = updatePlayer(state, playerId, (p) => removeOneCard(p, "invention"));
+      for (const resource of action.resources) {
+        next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [resource]: p.resources[resource] + 1 } }));
+      }
+      next = { ...next, log: [...next.log, `${currentPlayer(next).name} erfindet sich 2 Rohstoffe.`] };
+      return next;
+    }
+
+    case "playMonopoly": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      let next = updatePlayer(state, playerId, (p) => removeOneCard(p, "monopoly"));
+      let total = 0;
+      for (const other of next.players) {
+        if (other.id === playerId) continue;
+        const amount = other.resources[action.resource];
+        if (amount <= 0) continue;
+        total += amount;
+        next = updatePlayer(next, other.id, (p) => ({ ...p, resources: { ...p.resources, [action.resource]: 0 } }));
+      }
+      next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [action.resource]: p.resources[action.resource] + total } }));
+      next = { ...next, log: [...next.log, `${currentPlayer(next).name} verhängt ein Monopol auf ${action.resource} und kassiert ${total}.`] };
+      return next;
+    }
+
+    case "playBribery": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      const target = findTile(state, action.coord);
+      if (!target.revealed) throw new GameError("Feld ist noch nicht aufgedeckt.");
+      let next = updatePlayer(state, playerId, (p) => removeOneCard(p, "bribery"));
+      next = {
+        ...next,
+        briberyTileCoord: target.coord,
+        briberyBeneficiaryId: playerId,
+        log: [...next.log, `${currentPlayer(next).name} bestechen den Räuber — die Ernte eines ${target.terrain}-Felds wandert nun zu ihm.`],
+      };
+      return next;
+    }
+
+    case "bankTrade": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      if (action.give === action.receive) throw new GameError("Rohstoffe müssen unterschiedlich sein.");
+      const player = currentPlayer(state);
+      const ratio = bestBankRatio(state, playerId, action.give);
+      if (player.resources[action.give] < ratio) throw new GameError(`Du brauchst ${ratio}x ${action.give} für diesen Handel.`);
+      let next = updatePlayer(state, playerId, (p) => ({
+        ...p,
+        resources: {
+          ...p.resources,
+          [action.give]: p.resources[action.give] - ratio,
+          [action.receive]: p.resources[action.receive] + 1,
+        },
+      }));
+      next = { ...next, log: [...next.log, `${player.name} handelt ${ratio}x ${action.give} gegen 1x ${action.receive} mit der Bank.`] };
+      return next;
+    }
+
+    case "offerTrade": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      if (state.pendingTrade) throw new GameError("Es gibt bereits ein offenes Handelsangebot.");
+      const target = state.players.find((p) => p.id === action.toPlayerId);
+      if (!target) throw new GameError("Zielspieler nicht gefunden.");
+      const proposer = currentPlayer(state);
+      if (!hasEnoughResources(proposer, action.give)) throw new GameError("Du hast nicht genug Rohstoffe für dieses Angebot.");
+      const offer = { id: `${Date.now()}-${playerId}`, fromPlayerId: playerId, toPlayerId: action.toPlayerId, give: action.give, receive: action.receive };
+      return { ...state, pendingTrade: offer, log: [...state.log, `${proposer.name} bietet ${target.name} einen Handel an.`] };
+    }
+
+    case "respondTrade": {
+      const trade = state.pendingTrade;
+      if (!trade) throw new GameError("Kein offenes Handelsangebot.");
+      if (trade.toPlayerId !== playerId) throw new GameError("Dieses Angebot richtet sich nicht an dich.");
+      if (!action.accept) {
+        return { ...state, pendingTrade: null, log: [...state.log, "Handelsangebot abgelehnt."] };
+      }
+      const proposer = state.players.find((p) => p.id === trade.fromPlayerId);
+      const responder = state.players.find((p) => p.id === trade.toPlayerId);
+      if (!proposer || !responder) throw new GameError("Handelspartner nicht mehr im Spiel.");
+      if (!hasEnoughResources(proposer, trade.give) || !hasEnoughResources(responder, trade.receive)) {
+        return { ...state, pendingTrade: null, log: [...state.log, "Handel nicht mehr möglich — Rohstoffe haben sich geändert."] };
+      }
+      let next = updatePlayer(state, trade.fromPlayerId, (p) => payCost(p, trade.give));
+      next = updatePlayer(next, trade.toPlayerId, (p) => payCost(p, trade.receive));
+      next = updatePlayer(next, trade.fromPlayerId, (p) => {
+        const resources = { ...p.resources };
+        for (const r of RESOURCE_TYPES) resources[r] += trade.receive[r] ?? 0;
+        return { ...p, resources };
+      });
+      next = updatePlayer(next, trade.toPlayerId, (p) => {
+        const resources = { ...p.resources };
+        for (const r of RESOURCE_TYPES) resources[r] += trade.give[r] ?? 0;
+        return { ...p, resources };
+      });
+      next = { ...next, pendingTrade: null, log: [...next.log, `${proposer.name} und ${responder.name} handeln erfolgreich.`] };
+      return next;
+    }
+
     case "endTurn": {
       if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
       requireCurrentPlayer(state, playerId);
@@ -412,7 +669,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         throw new GameError("Räuber muss nach einer 7 erst bewegt werden.");
       }
       const nextIndex = (state.currentPlayerIndex + 1) % state.turnOrder.length;
-      return { ...state, currentPlayerIndex: nextIndex, lastDiceRoll: null, robberTileCoord: null };
+      return { ...state, currentPlayerIndex: nextIndex, lastDiceRoll: null, robberTileCoord: null, pendingTrade: null };
     }
 
     default:

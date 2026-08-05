@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio } from "@canos/shared";
 import { HexBoard, BuildMode } from "./HexBoard";
 
@@ -71,8 +71,69 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const incomingTrade = state.pendingTrade && state.pendingTrade.toPlayerId === myPlayerId ? state.pendingTrade : null;
   const outgoingTrade = state.pendingTrade && state.pendingTrade.fromPlayerId === myPlayerId ? state.pendingTrade : null;
 
+  const [turnPopup, setTurnPopup] = useState<string | null>(null);
+  const [gains, setGains] = useState<{ id: string; icon: string; amount: number }[]>([]);
+  const lastRollKeyRef = useRef<string>("");
+  const prevPlayerIndexRef = useRef<number | null>(null);
+  const prevResourcesRef = useRef(me?.resources);
+
+  // Announce a fresh dice roll for whoever's turn it is — keyed by the roll's
+  // own values (not object identity, since every broadcast recreates the
+  // state object even when nothing about the roll actually changed).
+  useEffect(() => {
+    const key = `${state.lastDiceRoll?.die1 ?? "x"}-${state.lastDiceRoll?.die2 ?? "x"}-${state.currentPlayerIndex}-${state.phase}`;
+    if (state.lastDiceRoll && key !== lastRollKeyRef.current) {
+      lastRollKeyRef.current = key;
+      const roller = state.players.find((p) => p.id === state.turnOrder[state.currentPlayerIndex]);
+      setTurnPopup(`🎲 ${roller?.name ?? "Jemand"} würfelt ${state.lastDiceRoll.total}!`);
+      const t = setTimeout(() => setTurnPopup(null), 2500);
+      return () => clearTimeout(t);
+    }
+    if (!state.lastDiceRoll) lastRollKeyRef.current = key;
+  }, [state.lastDiceRoll, state.currentPlayerIndex, state.phase, state.players, state.turnOrder]);
+
+  // Announce whenever the turn passes to someone new during the main game.
+  useEffect(() => {
+    if (state.phase !== "mainGame") {
+      prevPlayerIndexRef.current = state.currentPlayerIndex;
+      return;
+    }
+    if (prevPlayerIndexRef.current !== null && prevPlayerIndexRef.current !== state.currentPlayerIndex) {
+      const nextPlayer = state.players.find((p) => p.id === state.turnOrder[state.currentPlayerIndex]);
+      setTurnPopup(`▶️ ${nextPlayer?.name ?? "Jemand"} ist am Zug`);
+      const t = setTimeout(() => setTurnPopup(null), 2200);
+      prevPlayerIndexRef.current = state.currentPlayerIndex;
+      return () => clearTimeout(t);
+    }
+    prevPlayerIndexRef.current = state.currentPlayerIndex;
+  }, [state.currentPlayerIndex, state.phase]);
+
+  // Floating "+N" indicators whenever my own resources increase (dice
+  // production, trades, dev cards, ...).
+  useEffect(() => {
+    if (!me) return;
+    const prev = prevResourcesRef.current;
+    if (prev) {
+      const newGains: { id: string; icon: string; amount: number }[] = [];
+      for (const r of RESOURCE_TYPES) {
+        const diff = me.resources[r] - (prev[r] ?? 0);
+        if (diff > 0) newGains.push({ id: `${Date.now()}-${r}-${Math.random()}`, icon: RESOURCE_ICONS[r], amount: diff });
+      }
+      if (newGains.length > 0) {
+        setGains((g) => [...g, ...newGains]);
+        newGains.forEach((g) => setTimeout(() => setGains((cur) => cur.filter((x) => x.id !== g.id)), 1600));
+      }
+    }
+    prevResourcesRef.current = me.resources;
+  }, [me?.resources]);
+
   return (
     <div className="game-root">
+      {turnPopup && (
+        <div className="turn-popup">
+          <span>{turnPopup}</span>
+        </div>
+      )}
       <div className="board-area">
         <HexBoard
           state={state}
@@ -198,6 +259,15 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                 <span className="resource-count">{me.resources[key]}</span>
               </div>
             ))}
+            {gains.length > 0 && (
+              <div className="gain-indicator-layer">
+                {gains.map((g) => (
+                  <span key={g.id} className="gain-indicator">
+                    +{g.amount} {g.icon}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

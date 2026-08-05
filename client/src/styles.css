@@ -166,6 +166,7 @@ body {
 
 /* Game layout */
 .game-root {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -363,9 +364,80 @@ body {
 }
 
 .resource-panel {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
+}
+
+.turn-popup {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 500;
+  background: rgba(13, 27, 30, 0.95);
+  border: 2px solid #f4a261;
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 14px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+  animation: turn-popup-in-out 2.5s ease forwards;
+  white-space: nowrap;
+}
+
+@keyframes turn-popup-in-out {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.gain-indicator-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.gain-indicator {
+  position: absolute;
+  right: 6px;
+  top: -4px;
+  background: #2a9d8f;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  animation: gain-float-up 1.6s ease forwards;
+}
+
+@keyframes gain-float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
 }
 
 .resource-chip {

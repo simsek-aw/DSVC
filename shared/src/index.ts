@@ -30,6 +30,7 @@ export type {
   TradeOffer,
   ResourceRequest,
   Negotiation,
+  PendingSteal,
   GameState,
   ClientAction,
 } from "./types";
@@ -38,6 +39,7 @@ export {
   TERRAIN_NAMES_DE,
   BUILD_COSTS,
   VICTORY_POINTS_TO_WIN,
+  HAND_LIMIT_ON_SEVEN,
   LONGEST_ROAD_MIN_LENGTH,
   LARGEST_ARMY_MIN_KNIGHTS,
   LONGEST_ROAD_BONUS,
@@ -61,4 +63,5 @@ export {
   applyAction,
   totalVictoryPoints,
   bestBankRatio,
+  handSize,
 } from "./gameEngine";

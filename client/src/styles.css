@@ -651,7 +651,7 @@ body {
 
 .bottom-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
@@ -1028,4 +1028,174 @@ body {
 .negotiation-hand-row button:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Keeps this turn's roll visible alongside the action buttons. */
+.dice-result-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 46px;
+  border-radius: 10px;
+  border: 1px solid #e63946;
+  background: #2a1416;
+}
+
+.dice-result-faces {
+  font-size: 1.15rem;
+  line-height: 1;
+  color: #fff;
+}
+
+.dice-result-total {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f4a261;
+}
+
+.dice-roller.settled {
+  background: #2a1416;
+  border: 1px solid #e63946;
+  cursor: default;
+}
+
+/* --- Robber: discard + steal --- */
+.robber-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 880;
+  background: rgba(6, 14, 16, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.robber-overlay.passive {
+  background: rgba(6, 14, 16, 0.55);
+  pointer-events: none;
+}
+
+.robber-box {
+  width: min(430px, 100%);
+  background: #10242a;
+  border: 2px solid #e63946;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.robber-box h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.discard-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.discard-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: #142c30;
+  border-radius: 8px;
+  padding: 6px 2px;
+}
+
+.discard-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.discard-chosen {
+  color: #e63946;
+  font-size: 0.72rem;
+}
+
+.discard-buttons {
+  display: flex;
+  gap: 3px;
+}
+
+.discard-buttons button {
+  width: 24px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2a4a4f;
+  background: #1d3a3f;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.discard-buttons button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.victim-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.victim-list button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid;
+  border-radius: 10px;
+  background: #142c30;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+/* Fanned-out face-down hand the thief draws from. */
+.steal-hand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 12px 4px;
+  min-height: 90px;
+}
+
+.steal-card {
+  width: 42px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  border: 2px solid #457b9d;
+  background: repeating-linear-gradient(45deg, #1b263b, #1b263b 5px, #22304a 5px, #22304a 10px);
+  color: #6b8f94;
+  font-size: 1.3rem;
+  font-weight: 700;
+  cursor: pointer;
+  transform-origin: bottom center;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.steal-card:not(:disabled):hover {
+  border-color: #f4a261;
+  transform: translateY(-8px) !important;
+}
+
+.steal-card:disabled {
+  cursor: default;
 }

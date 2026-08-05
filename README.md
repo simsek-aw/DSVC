@@ -33,6 +33,17 @@ mit verdeckten Feldern, einer prozeduralen Insel und drei Räuber-Varianten.
    nächste 7 sofort wieder kassiert zu werden — bleibt aber durch das 7er-Risiko trotzdem
    ein Wagnis statt eines Garantie-Bonus.
 
+### Was bei einer 7 passiert
+
+1. **Abwerfen**: Wer mehr als 7 Rohstoffkarten hat, muss die Hälfte (abgerundet) abgeben und
+   wählt selbst aus, welche. Der Räuber lässt sich erst bewegen, wenn alle fertig sind.
+2. **Räuber setzen**: Der aktive Spieler wählt ein Feld, das damit blockiert wird.
+3. **Klauen**: Wer eine Siedlung oder Stadt an diesem Feld hat, kann bestohlen werden. Sitzen
+   dort mehrere Spieler, darf der Räubernde sich das Opfer **aussuchen**. Dessen Hand wird als
+   Fächer verdeckter Karten dargestellt, aus dem blind eine Position gezogen wird — und das
+   Opfer darf so lange **mischen**, bis wirklich gezogen wurde. Die Ritterkarte löst denselben
+   Ablauf aus.
+
 ## Entwicklungskarten
 
 Gekauft für 1 Erz + 1 Weizen + 1 Wolle, gespielt aus der eigenen (verdeckten) Hand:

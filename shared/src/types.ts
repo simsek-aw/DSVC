@@ -59,7 +59,7 @@ export interface Player {
   developmentCards: DevelopmentCardType[];
   knightsPlayed: number;
   victoryPoints: number; // from settlements/cities only — longest road & largest army are added on top when computing totals
-  turnOrderRoll: number | null;
+  turnOrderRoll: DiceRoll | null;
 }
 
 export type GamePhase =
@@ -95,6 +95,16 @@ export interface ResourceRequest {
 // The "big trade": a shared negotiation table two players push resources onto
 // until both confirm. Any change to either side clears both confirmations, so
 // nobody can quietly alter the deal after the other side has agreed.
+// After the robber lands, the thief picks a face-down card out of the victim's
+// hand. `hand` is the victim's cards in their current (hidden) order — the
+// victim may reshuffle it right up until the thief commits to a position.
+export interface PendingSteal {
+  thiefId: string;
+  candidateIds: string[]; // players adjacent to the robber who still hold cards
+  victimId: string | null; // set once the thief has picked whom to rob
+  hand: ResourceType[];
+}
+
 export interface Negotiation {
   id: string;
   initiatorId: string;
@@ -128,6 +138,10 @@ export interface GameState {
   pendingTrade: TradeOffer | null; // only one outstanding player-to-player offer at a time, for simplicity
   resourceRequest: ResourceRequest | null; // one open "I need X" call at a time
   negotiation: Negotiation | null; // one open negotiation table at a time
+  // On a 7, everyone over the hand limit must discard half before the robber
+  // may move. Maps player id → how many cards they still owe.
+  pendingDiscards: Record<string, number>;
+  pendingSteal: PendingSteal | null;
   // Demo rooms let a single device act as every player, so one person can try
   // the whole game (including both sides of a trade) without a second phone.
   demoMode: boolean;
@@ -143,6 +157,7 @@ export const BUILD_COSTS: Record<"road" | "settlement" | "city" | "developmentCa
 };
 
 export const VICTORY_POINTS_TO_WIN = 10;
+export const HAND_LIMIT_ON_SEVEN = 7; // more than this and you discard half on a 7
 export const LONGEST_ROAD_MIN_LENGTH = 5;
 export const LARGEST_ARMY_MIN_KNIGHTS = 3;
 export const LONGEST_ROAD_BONUS = 2;
@@ -172,6 +187,10 @@ export type ClientAction =
   | { type: "requestResource"; resource: ResourceType }
   | { type: "cancelResourceRequest" }
   | { type: "offerQuickTrade"; wantInReturn: ResourceType }
+  | { type: "discardResources"; resources: Partial<Record<ResourceType, number>> }
+  | { type: "chooseStealVictim"; victimId: string }
+  | { type: "shuffleStealHand" }
+  | { type: "stealCard"; index: number }
   | { type: "startNegotiation"; withPlayerId: string }
   | { type: "respondNegotiation"; accept: boolean }
   | { type: "changeNegotiationOffer"; resource: ResourceType; delta: 1 | -1 }

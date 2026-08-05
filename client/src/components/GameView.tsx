@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio } from "@canos/shared";
 import { HexBoard, BuildMode } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
+import { DiscardPanel, StealPanel } from "./RobberPanels";
 
 interface Props {
   state: GameState;
@@ -157,6 +158,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   return (
     <div className="game-root">
       <NegotiationTable state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
+      <DiscardPanel state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
+      <StealPanel state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
       {turnPopup && (
         <div className="turn-popup">
           <span>{turnPopup}</span>
@@ -260,6 +263,14 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
               Zug beenden
             </button>
+            {/* Keeps this turn's roll on screen instead of the dice vanishing. */}
+            <div className="dice-result-tile" title="Dein Wurf in dieser Runde">
+              <span className="dice-result-faces">
+                {DICE_FACES[state.lastDiceRoll.die1]}
+                {DICE_FACES[state.lastDiceRoll.die2]}
+              </span>
+              <span className="dice-result-total">{state.lastDiceRoll.total}</span>
+            </div>
           </div>
         )}
 
@@ -390,17 +401,21 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {state.phase === "turnOrderRoll" && me?.turnOrderRoll === null && (
-          <button className="primary-button" onClick={() => sendAction({ type: "rollTurnOrder" })}>
-            Würfeln
-          </button>
+        {/* Same dice widget for the opening roll and for every turn. */}
+        {state.phase === "turnOrderRoll" && (
+          <div className="action-bar">
+            <DiceRoller serverRoll={me?.turnOrderRoll ?? null} onRoll={() => sendAction({ type: "rollTurnOrder" })} keepResult />
+          </div>
         )}
 
-        {state.phase === "mainGame" && isMyTurn && (
+        {state.phase === "mainGame" && isMyTurn && !state.lastDiceRoll && (
           <div className="action-bar">
-            <DiceRoller serverRoll={state.lastDiceRoll} onRoll={() => sendAction({ type: "rollDice" })} />
-            {state.lastDiceRoll?.total === 7 && !state.robberTileCoord && <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>}
+            <DiceRoller serverRoll={null} onRoll={() => sendAction({ type: "rollDice" })} />
           </div>
+        )}
+
+        {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll?.total === 7 && !state.robberTileCoord && (
+          <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>
         )}
 
         {showCards && me && (
@@ -540,9 +555,11 @@ const DICE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 function DiceRoller({
   serverRoll,
   onRoll,
+  keepResult = false,
 }: {
   serverRoll: { die1: number; die2: number; total: number } | null;
   onRoll: () => void;
+  keepResult?: boolean;
 }) {
   const [rolling, setRolling] = useState(false);
   const [display, setDisplay] = useState<[number, number]>([1, 1]);
@@ -576,7 +593,18 @@ function DiceRoller({
     if (intervalRef.current) clearInterval(intervalRef.current);
   }, []);
 
-  if (serverRoll && !rolling) return null; // already rolled — the popup/log already told us the result
+  if (serverRoll && !rolling) {
+    // Already rolled. Either keep the faces on screen (opening roll, where
+    // there is no other place showing them) or step aside for whatever does.
+    if (!keepResult) return null;
+    return (
+      <div className="dice-roller settled">
+        <span className="dice-face">{DICE_FACES[serverRoll.die1]}</span>
+        <span className="dice-face">{DICE_FACES[serverRoll.die2]}</span>
+        <span className="dice-hint">= {serverRoll.total}</span>
+      </div>
+    );
+  }
 
   const onPointerDown = (e: React.PointerEvent) => {
     dragStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() };

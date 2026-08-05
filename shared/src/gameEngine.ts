@@ -15,6 +15,7 @@ import {
   LONGEST_ROAD_MIN_LENGTH,
   Player,
   ResourceType,
+  HAND_LIMIT_ON_SEVEN,
   RESOURCE_TYPES,
   Road,
   TERRAIN_NAMES_DE,
@@ -76,6 +77,8 @@ export function createLobby(roomId: string): GameState {
     pendingTrade: null,
     resourceRequest: null,
     negotiation: null,
+    pendingDiscards: {},
+    pendingSteal: null,
     demoMode: false,
     winnerId: null,
     log: [],
@@ -190,6 +193,47 @@ function nextIndexSnake(state: GameState): { index: number; setupRound: 1 | 2; d
 
 function revealAllNumbers(state: GameState): GameState {
   return { ...state, tiles: state.tiles.map((t) => ({ ...t, numberRevealed: true })) };
+}
+
+export function handSize(player: Player): number {
+  return RESOURCE_TYPES.reduce((sum, r) => sum + player.resources[r], 0);
+}
+
+// Flattens a player's resource counts into one card per entry, then shuffles —
+// this is the face-down hand the thief picks a position from.
+function buildShuffledHand(player: Player): ResourceType[] {
+  const cards: ResourceType[] = [];
+  for (const r of RESOURCE_TYPES) for (let i = 0; i < player.resources[r]; i++) cards.push(r);
+  return shuffle(cards);
+}
+
+// Anyone with a settlement/city touching the robber's tile (other than the
+// thief) who still holds at least one card is fair game.
+function stealCandidates(state: GameState, tile: Tile, thiefId: string): string[] {
+  const owners = new Set(producersForTile(state, tile).map((b) => b.ownerId));
+  return Array.from(owners).filter((id) => {
+    if (id === thiefId) return false;
+    const p = state.players.find((pl) => pl.id === id);
+    return !!p && handSize(p) > 0;
+  });
+}
+
+function beginSteal(state: GameState, tile: Tile, thiefId: string): GameState {
+  const candidateIds = stealCandidates(state, tile, thiefId);
+  if (candidateIds.length === 0) return state;
+  // With exactly one possible victim there is nothing to choose, so go
+  // straight to picking a card out of their hand.
+  const victimId = candidateIds.length === 1 ? candidateIds[0] : null;
+  const victim = victimId ? state.players.find((p) => p.id === victimId) : null;
+  return {
+    ...state,
+    pendingSteal: {
+      thiefId,
+      candidateIds,
+      victimId,
+      hand: victim ? buildShuffledHand(victim) : [],
+    },
+  };
 }
 
 function producersForTile(state: GameState, tile: Tile): Building[] {
@@ -349,10 +393,10 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       if (!player) throw new GameError("Spieler nicht gefunden.");
       if (player.turnOrderRoll !== null) throw new GameError("Du hast schon gewürfelt.");
       const roll = rollTwoDice();
-      let next = updatePlayer(state, playerId, (p) => ({ ...p, turnOrderRoll: roll.total }));
+      let next = updatePlayer(state, playerId, (p) => ({ ...p, turnOrderRoll: roll }));
       next = { ...next, log: [...next.log, `${player.name} würfelt ${roll.total} für die Startreihenfolge.`] };
       if (next.players.every((p) => p.turnOrderRoll !== null)) {
-        const ordered = [...next.players].sort((a, b) => (b.turnOrderRoll ?? 0) - (a.turnOrderRoll ?? 0));
+        const ordered = [...next.players].sort((a, b) => (b.turnOrderRoll?.total ?? 0) - (a.turnOrderRoll?.total ?? 0));
         next = {
           ...next,
           turnOrder: ordered.map((p) => p.id),
@@ -441,9 +485,35 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
           next = { ...next, briberyTileCoord: null, briberyBeneficiaryId: null, log: [...next.log, "Die 7 deckt die Bestechung auf — der Effekt ist aufgehoben!"] };
         }
         next = { ...next, log: [...next.log, "7 gewürfelt! Der klassische Räuber muss bewegt werden."] };
+        // Everyone over the hand limit gives up half (rounded down) first.
+        const discards: Record<string, number> = {};
+        for (const p of next.players) {
+          const size = handSize(p);
+          if (size > HAND_LIMIT_ON_SEVEN) discards[p.id] = Math.floor(size / 2);
+        }
+        if (Object.keys(discards).length > 0) {
+          const names = next.players.filter((p) => discards[p.id]).map((p) => `${p.name} (${discards[p.id]})`);
+          next = { ...next, pendingDiscards: discards, log: [...next.log, `Zu viele Karten — abwerfen: ${names.join(", ")}.`] };
+        }
       } else {
         next = produceResources(next, roll.total);
       }
+      return next;
+    }
+
+    case "discardResources": {
+      const owed = state.pendingDiscards[playerId] ?? 0;
+      if (owed <= 0) throw new GameError("Du musst nichts abwerfen.");
+      const player = state.players.find((p) => p.id === playerId);
+      if (!player) throw new GameError("Spieler nicht gefunden.");
+      const total = RESOURCE_TYPES.reduce((sum, r) => sum + (action.resources[r] ?? 0), 0);
+      if (total !== owed) throw new GameError(`Du musst genau ${owed} Karten abwerfen.`);
+      if (!hasEnoughResources(player, action.resources)) throw new GameError("So viele Karten hast du nicht.");
+
+      let next = updatePlayer(state, playerId, (p) => payCost(p, action.resources));
+      const remaining = { ...next.pendingDiscards };
+      delete remaining[playerId];
+      next = { ...next, pendingDiscards: remaining, log: [...next.log, `${player.name} wirft ${owed} Karten ab.`] };
       return next;
     }
 
@@ -451,6 +521,8 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
       requireCurrentPlayer(state, playerId);
       if (!state.lastDiceRoll || state.lastDiceRoll.total !== 7) throw new GameError("Räuber darf nur nach einer 7 bewegt werden.");
+      if (Object.keys(state.pendingDiscards).length > 0)
+        throw new GameError("Erst müssen alle überzähligen Karten abgeworfen werden.");
       const target = findTile(state, action.coord);
       let next: GameState = {
         ...state,
@@ -458,7 +530,50 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         robberTileCoord: target.coord,
       };
       next = { ...next, log: [...next.log, `Räuber wandert auf ein ${TERRAIN_NAMES_DE[target.terrain]}-Feld.`] };
+      next = beginSteal(next, findTile(next, target.coord), playerId);
       return next;
+    }
+
+    case "chooseStealVictim": {
+      const steal = state.pendingSteal;
+      if (!steal) throw new GameError("Gerade ist kein Raubzug offen.");
+      if (steal.thiefId !== playerId) throw new GameError("Das ist nicht dein Raubzug.");
+      if (steal.victimId) throw new GameError("Das Opfer steht schon fest.");
+      if (!steal.candidateIds.includes(action.victimId)) throw new GameError("Dieser Spieler ist kein gültiges Ziel.");
+      const victim = state.players.find((p) => p.id === action.victimId);
+      if (!victim) throw new GameError("Spieler nicht gefunden.");
+      return { ...state, pendingSteal: { ...steal, victimId: action.victimId, hand: buildShuffledHand(victim) } };
+    }
+
+    case "shuffleStealHand": {
+      const steal = state.pendingSteal;
+      if (!steal || !steal.victimId) throw new GameError("Gerade wird nichts von dir gestohlen.");
+      if (steal.victimId !== playerId) throw new GameError("Das ist nicht deine Hand.");
+      return { ...state, pendingSteal: { ...steal, hand: shuffle(steal.hand) } };
+    }
+
+    case "stealCard": {
+      const steal = state.pendingSteal;
+      if (!steal) throw new GameError("Gerade ist kein Raubzug offen.");
+      if (steal.thiefId !== playerId) throw new GameError("Das ist nicht dein Raubzug.");
+      if (!steal.victimId) throw new GameError("Wähle zuerst ein Opfer.");
+      const victim = state.players.find((p) => p.id === steal.victimId);
+      const thief = state.players.find((p) => p.id === playerId);
+      if (!victim || !thief) throw new GameError("Spieler nicht gefunden.");
+      if (action.index < 0 || action.index >= steal.hand.length) throw new GameError("Diese Karte gibt es nicht.");
+
+      const stolen = steal.hand[action.index];
+      // The hand snapshot could be stale if the victim traded meanwhile.
+      if (victim.resources[stolen] < 1) {
+        return { ...state, pendingSteal: null, log: [...state.log, "Der Raubzug ging ins Leere."] };
+      }
+      let next = updatePlayer(state, steal.victimId, (p) => ({ ...p, resources: { ...p.resources, [stolen]: p.resources[stolen] - 1 } }));
+      next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [stolen]: p.resources[stolen] + 1 } }));
+      return {
+        ...next,
+        pendingSteal: null,
+        log: [...next.log, `${thief.name} stiehlt ${TERRAIN_NAMES_DE[stolen]} von ${victim.name}.`],
+      };
     }
 
     case "buildRoad": {
@@ -549,19 +664,8 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         tiles: next.tiles.map((t) => ({ ...t, hasClassicRobber: axialKey(t.coord) === axialKey(target.coord) })),
         log: [...next.log, `${currentPlayer(next).name} spielt einen Ritter und bewegt den Räuber.`],
       };
-      const victims = producersForTile(next, target).filter((b) => b.ownerId !== playerId);
-      const victimIds = Array.from(new Set(victims.map((b) => b.ownerId)));
-      if (victimIds.length > 0) {
-        const victimId = victimIds[Math.floor(Math.random() * victimIds.length)];
-        const victim = next.players.find((p) => p.id === victimId)!;
-        const available = RESOURCE_TYPES.filter((r) => victim.resources[r] > 0);
-        if (available.length > 0) {
-          const stolen = available[Math.floor(Math.random() * available.length)];
-          next = updatePlayer(next, victimId, (p) => ({ ...p, resources: { ...p.resources, [stolen]: p.resources[stolen] - 1 } }));
-          next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [stolen]: p.resources[stolen] + 1 } }));
-          next = { ...next, log: [...next.log, `${currentPlayer(next).name} stiehlt eine Karte von ${victim.name}.`] };
-        }
-      }
+      // Same pick-a-victim-then-pick-a-card flow as the robber on a 7.
+      next = beginSteal(next, findTile(next, target.coord), playerId);
       next = recomputeLargestArmy(next);
       next = checkVictory(next);
       return next;
@@ -854,8 +958,10 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       if (state.lastDiceRoll.total === 7 && !state.robberTileCoord) {
         throw new GameError("Räuber muss nach einer 7 erst bewegt werden.");
       }
+      if (Object.keys(state.pendingDiscards).length > 0) throw new GameError("Es müssen noch Karten abgeworfen werden.");
+      if (state.pendingSteal) throw new GameError("Der Raubzug ist noch nicht abgeschlossen.");
       const nextIndex = (state.currentPlayerIndex + 1) % state.turnOrder.length;
-      return { ...state, currentPlayerIndex: nextIndex, lastDiceRoll: null, robberTileCoord: null, pendingTrade: null };
+      return { ...state, currentPlayerIndex: nextIndex, lastDiceRoll: null, robberTileCoord: null, pendingTrade: null, resourceRequest: null };
     }
 
     default:

@@ -1,0 +1,47 @@
+import { useState } from "react";
+import { socket } from "../socket";
+
+export function Lobby() {
+  const [name, setName] = useState("");
+  const [roomId, setRoomId] = useState("");
+
+  return (
+    <div className="lobby-screen">
+      <h1>Canos Incognita</h1>
+      <p className="subtitle">Ein verdecktes Inselabenteuer für 2–6 Spieler</p>
+
+      <input
+        className="text-input"
+        placeholder="Dein Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={20}
+      />
+
+      <button
+        className="primary-button"
+        disabled={!name.trim()}
+        onClick={() => socket.emit("createRoom", { playerName: name.trim() })}
+      >
+        Neuen Raum erstellen
+      </button>
+
+      <div className="divider">oder</div>
+
+      <input
+        className="text-input"
+        placeholder="Raum-Code"
+        value={roomId}
+        onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+        maxLength={8}
+      />
+      <button
+        className="secondary-button"
+        disabled={!name.trim() || !roomId.trim()}
+        onClick={() => socket.emit("joinRoom", { roomId: roomId.trim(), playerName: name.trim() })}
+      >
+        Raum beitreten
+      </button>
+    </div>
+  );
+}

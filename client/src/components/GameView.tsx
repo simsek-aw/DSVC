@@ -279,11 +279,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
         {state.phase === "mainGame" && isMyTurn && (
           <div className="action-bar">
-            {!state.lastDiceRoll && (
-              <button className="primary-button" onClick={() => sendAction({ type: "rollDice" })}>
-                Würfeln
-              </button>
-            )}
+            <DiceRoller serverRoll={state.lastDiceRoll} onRoll={() => sendAction({ type: "rollDice" })} />
             {state.lastDiceRoll?.total === 7 && !state.robberTileCoord && <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>}
             {state.lastDiceRoll && (
               <>
@@ -443,6 +439,82 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+const DICE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
+function DiceRoller({
+  serverRoll,
+  onRoll,
+}: {
+  serverRoll: { die1: number; die2: number; total: number } | null;
+  onRoll: () => void;
+}) {
+  const [rolling, setRolling] = useState(false);
+  const [display, setDisplay] = useState<[number, number]>([1, 1]);
+  const dragStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const triggerRoll = () => {
+    if (rolling || serverRoll) return;
+    setRolling(true);
+    intervalRef.current = setInterval(() => {
+      setDisplay([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]);
+    }, 80);
+    onRoll();
+  };
+
+  // Once the server's real roll arrives, let the tumble play a little longer
+  // then settle on the actual faces — a "swipe and immediately snap" felt
+  // less physical than a brief tumble even when the round-trip is instant.
+  useEffect(() => {
+    if (serverRoll && rolling) {
+      const settle = setTimeout(() => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setDisplay([serverRoll.die1, serverRoll.die2]);
+        setRolling(false);
+      }, 500);
+      return () => clearTimeout(settle);
+    }
+  }, [serverRoll, rolling]);
+
+  useEffect(() => () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  }, []);
+
+  if (serverRoll && !rolling) return null; // already rolled — the log/result display below takes over
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    dragStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() };
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const start = dragStartRef.current;
+    dragStartRef.current = null;
+    if (!start) return;
+    const dist = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    const dt = Date.now() - start.t;
+    // A clear flick (far + fast) or a plain tap both roll — the flick is just
+    // the fun way to trigger the same thing a click already would.
+    if ((dist > 15 && dt < 600) || dist < 8) triggerRoll();
+  };
+
+  return (
+    <div
+      className={`dice-roller ${rolling ? "rolling" : ""}`}
+      style={{ touchAction: "none" }}
+      role="button"
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") triggerRoll();
+      }}
+    >
+      <span className="dice-face">{DICE_FACES[display[0]]}</span>
+      <span className="dice-face">{DICE_FACES[display[1]]}</span>
+      <span className="dice-hint">{rolling ? "…" : "Wischen zum Würfeln"}</span>
     </div>
   );
 }

@@ -486,6 +486,53 @@ body {
   text-align: center;
 }
 
+.dice-roller {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #e63946;
+  border-radius: 14px;
+  padding: 10px 16px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dice-roller:active {
+  cursor: grabbing;
+}
+
+.dice-roller .dice-face {
+  font-size: 2.2rem;
+  line-height: 1;
+  color: #fff;
+}
+
+.dice-roller.rolling .dice-face {
+  animation: dice-tumble 0.15s linear infinite;
+}
+
+@keyframes dice-tumble {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(-12deg) scale(1.08);
+  }
+  100% {
+    transform: rotate(10deg) scale(1);
+  }
+}
+
+.dice-roller .dice-hint {
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
 .log-panel {
   flex: 1;
   overflow-y: auto;

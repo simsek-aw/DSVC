@@ -16,6 +16,14 @@ const RESOURCE_LABELS: Record<ResourceType, string> = {
   sheep: "🐑 Wolle",
 };
 
+const RESOURCE_ICONS: Record<ResourceType, string> = {
+  wood: "🪵",
+  brick: "🧱",
+  ore: "⛏️",
+  wheat: "🌾",
+  sheep: "🐑",
+};
+
 const CARD_LABELS: Record<DevelopmentCardType, string> = {
   knight: "⚔️ Ritter",
   roadBuilding: "🛤️ Straßenbau",
@@ -113,8 +121,9 @@ export function GameView({ state, myPlayerId, sendAction }: Props) {
         {me && (
           <div className="resource-panel">
             {RESOURCE_TYPES.map((key) => (
-              <div key={key} className="resource-chip">
-                {RESOURCE_LABELS[key]}: {me.resources[key]}
+              <div key={key} className="resource-chip" title={RESOURCE_LABELS[key]}>
+                <span className="resource-icon">{RESOURCE_ICONS[key]}</span>
+                <span className="resource-count">{me.resources[key]}</span>
               </div>
             ))}
           </div>

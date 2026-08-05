@@ -1,5 +1,6 @@
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body, #root {
@@ -12,6 +13,12 @@ body {
   color: #f1faee;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   overscroll-behavior: none;
+}
+
+.hex-board, .hex-board * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .app-root {

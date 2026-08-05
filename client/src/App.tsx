@@ -78,16 +78,24 @@ export default function App() {
     socket.emit("action", { roomId: session.roomId, action });
   };
 
+  const leaveRoom = () => {
+    if (sessionRef.current) socket.emit("leaveRoom", { roomId: sessionRef.current.roomId });
+    localStorage.removeItem(SESSION_KEY);
+    sessionRef.current = null;
+    setSession(null);
+    setState(null);
+  };
+
   return (
     <div className="app-root">
       {error && <div className="toast-error">{error}</div>}
       {!session && <Lobby />}
       {session && !state && <div className="centered-message">Verbinde …</div>}
       {session && state && state.phase === "lobby" && (
-        <WaitingRoom state={state} myPlayerId={session.playerId} roomId={session.roomId} sendAction={sendAction} />
+        <WaitingRoom state={state} myPlayerId={session.playerId} roomId={session.roomId} sendAction={sendAction} onLeave={leaveRoom} />
       )}
       {session && state && state.phase !== "lobby" && (
-        <GameView state={state} myPlayerId={session.playerId} sendAction={sendAction} />
+        <GameView state={state} myPlayerId={session.playerId} sendAction={sendAction} onLeave={leaveRoom} />
       )}
     </div>
   );

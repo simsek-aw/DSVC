@@ -5,9 +5,10 @@ interface Props {
   myPlayerId: string;
   roomId: string;
   sendAction: (action: any) => void;
+  onLeave: () => void;
 }
 
-export function WaitingRoom({ state, myPlayerId, roomId, sendAction }: Props) {
+export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: Props) {
   const isHost = state.players[0]?.id === myPlayerId;
 
   return (
@@ -37,6 +38,10 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction }: Props) {
       ) : (
         <p className="hint">Warte, bis der Host das Spiel startet …</p>
       )}
+
+      <button className="secondary-button" onClick={onLeave}>
+        Raum verlassen
+      </button>
     </div>
   );
 }

@@ -51,6 +51,7 @@ export {
   GameError,
   createLobby,
   addPlayer,
+  removePlayer,
   setPlayerConnected,
   startGame,
   applyAction,

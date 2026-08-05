@@ -95,6 +95,17 @@ export function addPlayer(state: GameState, playerId: string, name: string): Gam
   return { ...state, players: [...state.players, player], log: [...state.log, `${name} ist beigetreten.`] };
 }
 
+export function removePlayer(state: GameState, playerId: string): GameState {
+  if (state.phase !== "lobby") throw new GameError("Der Raum kann nach Spielstart nicht mehr verlassen werden.");
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return state;
+  return {
+    ...state,
+    players: state.players.filter((p) => p.id !== playerId),
+    log: [...state.log, `${player.name} hat den Raum verlassen.`],
+  };
+}
+
 export function setPlayerConnected(state: GameState, playerId: string, connected: boolean): GameState {
   return {
     ...state,

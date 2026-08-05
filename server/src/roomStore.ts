@@ -39,3 +39,8 @@ export function saveRoom(state: GameState): void {
 export function allRoomIds(): string[] {
   return Array.from(rooms.keys());
 }
+
+export function deleteRoom(roomId: string): void {
+  rooms.delete(roomId);
+  fs.unlink(filePathFor(roomId), () => {});
+}

@@ -4,8 +4,8 @@ import http from "http";
 import path from "path";
 import { customAlphabet } from "nanoid";
 import { Server } from "socket.io";
-import { addPlayer, applyAction, createLobby, GameError, GameState, setPlayerConnected } from "@canos/shared";
-import { getRoom, loadAllRoomsFromDisk, saveRoom } from "./roomStore";
+import { addPlayer, applyAction, createLobby, GameError, GameState, removePlayer, setPlayerConnected } from "@canos/shared";
+import { deleteRoom, getRoom, loadAllRoomsFromDisk, saveRoom } from "./roomStore";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
@@ -75,6 +75,24 @@ io.on("connection", (socket) => {
     saveRoom(state);
     socket.emit("joined", { roomId, playerId });
     broadcastState(roomId);
+  });
+
+  socket.on("leaveRoom", ({ roomId }: { roomId: string }) => {
+    const state = getRoom(roomId);
+    if (!state) return;
+    const playerId = (socket as any).canosPlayerId ?? socket.id;
+    try {
+      const next = removePlayer(state, playerId);
+      socket.leave(roomId);
+      if (next.players.length === 0) {
+        deleteRoom(roomId);
+      } else {
+        saveRoom(next);
+        broadcastState(roomId);
+      }
+    } catch (err) {
+      socket.emit("errorMessage", err instanceof GameError ? err.message : "Verlassen fehlgeschlagen.");
+    }
   });
 
   socket.on("action", ({ roomId, action }: { roomId: string; action: any }) => {

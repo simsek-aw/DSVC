@@ -117,6 +117,17 @@ body {
   color: #fff;
 }
 
+.leave-button {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid #2a4a4f;
+  color: #a8dadc;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .divider {
   color: #6b8f94;
   font-size: 0.85rem;

@@ -6,6 +6,7 @@ interface Props {
   state: GameState;
   myPlayerId: string;
   sendAction: (action: any) => void;
+  onLeave: () => void;
 }
 
 const RESOURCE_LABELS: Record<ResourceType, string> = {
@@ -32,7 +33,7 @@ const CARD_LABELS: Record<DevelopmentCardType, string> = {
   bribery: "💰 Bestechung",
 };
 
-export function GameView({ state, myPlayerId, sendAction }: Props) {
+export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [buildMode, setBuildMode] = useState<BuildMode>(null);
   const [freeRoadEdges, setFreeRoadEdges] = useState<EdgeId[]>([]);
   const [inventionPicks, setInventionPicks] = useState<[ResourceType, ResourceType]>(["wood", "wood"]);
@@ -106,6 +107,17 @@ export function GameView({ state, myPlayerId, sendAction }: Props) {
       </div>
 
       <div className="sidebar">
+        <button
+          className="leave-button"
+          onClick={() => {
+            if (window.confirm("Spiel wirklich verlassen? Ein laufendes Spiel kannst du auf diesem Gerät danach nicht mehr fortsetzen.")) {
+              onLeave();
+            }
+          }}
+        >
+          ← Verlassen
+        </button>
+
         <div className="player-cards">
           {state.players.map((p) => (
             <div key={p.id} className={`player-card ${p.id === currentPlayerId ? "active" : ""}`} style={{ borderColor: p.color }}>

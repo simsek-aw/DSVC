@@ -161,6 +161,7 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
       <rect x={0} y={0} width="100%" height="100%" fill="url(#water)" />
       <rect x={0} y={0} width="100%" height="100%" fill="url(#waterVignette)" />
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
+        <CoastLayer tiles={state.tiles} scale={view.scale} />
         {state.tiles.map((tile) => {
           const center = px(tile.coord);
           const isBribed = state.briberyTileCoord && axialKey(state.briberyTileCoord) === axialKey(tile.coord);
@@ -410,6 +411,25 @@ const TERRAIN_TEXTURES: Record<string, { base: string; marks: Mark[] }> = {
       [0, 0, 1, 1, "#c9e07a"], [7, 5, 1, 1, "#c9e07a"], [4, 3, 1, 1, "#c9e07a"],
     ],
   },
+  // Not terrains — the two rings that make the island sit in shallow water:
+  // a pale beach right at the shoreline and a lighter sandbank under water.
+  sand: {
+    base: "#f0dfae",
+    marks: [
+      [1, 1, 2, 1, "#d6bd85"], [5, 0, 1, 1, "#d6bd85"], [3, 3, 2, 1, "#d6bd85"],
+      [6, 4, 1, 1, "#d6bd85"], [0, 6, 2, 1, "#d6bd85"], [4, 7, 2, 1, "#d6bd85"],
+      [2, 2, 1, 1, "#f6ecc9"], [7, 1, 1, 1, "#f6ecc9"], [5, 5, 1, 1, "#f6ecc9"],
+      [1, 4, 1, 1, "#f6ecc9"],
+    ],
+  },
+  shallow: {
+    base: "#4f96e0",
+    marks: [
+      [0, 1, 3, 1, "#79b4ec"], [5, 2, 2, 1, "#79b4ec"],
+      [2, 4, 3, 1, "#79b4ec"], [6, 6, 2, 1, "#79b4ec"],
+      [3, 0, 1, 1, "#3878d0"], [1, 5, 2, 1, "#3878d0"], [5, 7, 2, 1, "#3878d0"],
+    ],
+  },
   desert: {
     base: "#d4a373",
     marks: [
@@ -420,6 +440,35 @@ const TERRAIN_TEXTURES: Record<string, { base: string; marks: Mark[] }> = {
     ],
   },
 };
+
+/**
+ * The shoreline. Three concentric rings of the same hex silhouette are drawn
+ * underneath the tiles — sandbank, beach, then the tiles themselves on top.
+ * Because every ring is a plain fill with no stroke, the overlapping hexes
+ * merge into one island outline instead of showing per-tile seams, and the
+ * scalloped edge that falls out of it looks hand-drawn rather than geometric.
+ */
+function CoastLayer({ tiles, scale }: { tiles: Tile[]; scale: number }) {
+  const rings: { factor: number; fill: string; opacity?: number }[] = [
+    { factor: 1.42, fill: "url(#terrain-shallow)", opacity: 0.5 },
+    { factor: 1.28, fill: "url(#terrain-shallow)" },
+    { factor: 1.14, fill: "url(#terrain-sand)" },
+  ];
+  return (
+    <g pointerEvents="none">
+      {rings.map((ring) => (
+        <g key={ring.factor} fill={ring.fill} fillOpacity={ring.opacity}>
+          {tiles.map((tile) => (
+            <polygon
+              key={axialKey(tile.coord)}
+              points={tilePolygonPoints(axialToPixel(tile.coord, scale), scale * ring.factor)}
+            />
+          ))}
+        </g>
+      ))}
+    </g>
+  );
+}
 
 /** One repeating texture per terrain, scaled to match the current zoom. */
 function TerrainPatterns({ scale }: { scale: number }) {

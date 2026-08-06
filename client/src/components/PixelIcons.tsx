@@ -219,6 +219,32 @@ export function MarkerSpriteAt({ kind, x, y, size }: { kind: MarkerKind; x: numb
   );
 }
 
+// --- Dice --------------------------------------------------------------------
+// Pip layout on a 3x3 grid; each entry is the lit cells for that face value.
+const DIE_PIPS: Record<number, [number, number][]> = {
+  1: [[1, 1]],
+  2: [[0, 0], [2, 2]],
+  3: [[0, 0], [1, 1], [2, 2]],
+  4: [[0, 0], [2, 0], [0, 2], [2, 2]],
+  5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]],
+  6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]],
+};
+
+/** A single white pixel die with dark pips, rounded like the number chips. */
+export function PixelDie({ value, size = 30 }: { value: number; size?: number }) {
+  const pips = DIE_PIPS[value] ?? DIE_PIPS[1];
+  const pad = 3; // grid units of margin inside the 16-unit face
+  const step = (16 - pad * 2 - 2) / 2; // spacing between the 3 pip columns
+  return (
+    <svg className="pixel-die" width={size} height={size} viewBox="0 0 16 16" shapeRendering="crispEdges" aria-label={`Würfel ${value}`}>
+      <rect x="0.5" y="0.5" width="15" height="15" rx="3" fill="#f4ecd8" stroke="#2b2118" strokeWidth="1" />
+      {pips.map(([gx, gy], i) => (
+        <rect key={i} x={pad + gx * step} y={pad + gy * step} width="2" height="2" rx="0.5" fill="#2b2118" />
+      ))}
+    </svg>
+  );
+}
+
 // --- Number chips -----------------------------------------------------------
 // A 3x5 pixel digit font, the smallest size where every digit still reads.
 const DIGITS: Record<string, string[]> = {

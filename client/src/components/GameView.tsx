@@ -3,6 +3,7 @@ import {
   BUILD_COSTS,
   CHAT_MAX_LENGTH,
   CHAT_PREFIX,
+  PIECE_LIMITS,
   DevelopmentCardType,
   EdgeId,
   GameState,
@@ -14,7 +15,7 @@ import {
 import { HexBoard, BuildMode, MapInfo } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
-import { ResourceSprite } from "./PixelIcons";
+import { ResourceSprite, PixelDie } from "./PixelIcons";
 
 interface Props {
   state: GameState;
@@ -72,6 +73,30 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const currentPlayer = state.players.find((p) => p.id === currentPlayerId);
   const isMyTurn = currentPlayerId === myPlayerId;
   const otherPlayers = state.players.filter((p) => p.id !== myPlayerId);
+
+  // My remaining physical pieces (classic Catan stock), for the sidebar tally.
+  const myPieces = {
+    settlement: PIECE_LIMITS.settlement - state.buildings.filter((b) => b.ownerId === myPlayerId && b.type === "settlement").length,
+    city: PIECE_LIMITS.city - state.buildings.filter((b) => b.ownerId === myPlayerId && b.type === "city").length,
+    road: PIECE_LIMITS.road - state.roads.filter((r) => r.ownerId === myPlayerId).length,
+  };
+
+  // What the game is waiting for right now, phrased as a short prompt.
+  const currentConnected = currentPlayer?.connected ?? true;
+  const myActionHint =
+    state.phase === "mainGame" && isMyTurn
+      ? state.lastDiceRoll
+        ? "Du bist dran — bauen, handeln oder Zug beenden."
+        : "Du bist dran — würfeln!"
+      : state.phase === "setup" && isMyTurn
+      ? state.setupStepAwaitingRoad
+        ? "Du bist dran — lege deine Straße."
+        : "Du bist dran — setze deine Siedlung."
+      : null;
+  const waitingFor =
+    !isMyTurn && (state.phase === "mainGame" || state.phase === "setup")
+      ? `Wartet auf ${currentPlayer?.name ?? "…"}${currentConnected ? " …" : " (offline)"}`
+      : null;
 
   const exitBuildMode = () => {
     setBuildMode(null);
@@ -283,6 +308,18 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             </div>
           ))}
         </div>
+
+        {myActionHint && <div className="action-hint you">{myActionHint}</div>}
+        {waitingFor && <div className="action-hint waiting">⏳ {waitingFor}</div>}
+
+        {/* My remaining stock of pieces. */}
+        {(state.phase === "mainGame" || state.phase === "setup") && (
+          <div className="piece-tally" title="Deine verbleibenden Bauteile">
+            <span className={myPieces.road === 0 ? "depleted" : ""}>🛤️ {myPieces.road}</span>
+            <span className={myPieces.settlement === 0 ? "depleted" : ""}>🏠 {myPieces.settlement}</span>
+            <span className={myPieces.city === 0 ? "depleted" : ""}>🏙️ {myPieces.city}</span>
+          </div>
+        )}
 
         {state.phase === "setup" && (
           <p className="hint setup-note">
@@ -613,8 +650,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
               {/* Keeps this turn's roll on screen instead of the dice vanishing. */}
               <div className="dice-result-tile" title="Dein Wurf in dieser Runde">
                 <span className="dice-result-faces">
-                  {DICE_FACES[state.lastDiceRoll.die1]}
-                  {DICE_FACES[state.lastDiceRoll.die2]}
+                  <PixelDie value={state.lastDiceRoll.die1} size={18} />
+                  <PixelDie value={state.lastDiceRoll.die2} size={18} />
                 </span>
                 <span className="dice-result-total">{state.lastDiceRoll.total}</span>
               </div>
@@ -626,7 +663,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   );
 }
 
-const DICE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
 function DiceRoller({
   serverRoll,
@@ -675,8 +711,8 @@ function DiceRoller({
     if (!keepResult) return null;
     return (
       <div className="dice-roller settled">
-        <span className="dice-face">{DICE_FACES[serverRoll.die1]}</span>
-        <span className="dice-face">{DICE_FACES[serverRoll.die2]}</span>
+        <PixelDie value={serverRoll.die1} size={30} />
+        <PixelDie value={serverRoll.die2} size={30} />
         <span className="dice-hint">= {serverRoll.total}</span>
       </div>
     );
@@ -707,8 +743,8 @@ function DiceRoller({
         if (e.key === "Enter" || e.key === " ") triggerRoll();
       }}
     >
-      <span className="dice-face">{DICE_FACES[display[0]]}</span>
-      <span className="dice-face">{DICE_FACES[display[1]]}</span>
+      <PixelDie value={display[0]} size={30} />
+      <PixelDie value={display[1]} size={30} />
       <span className="dice-hint">{rolling ? "…" : "Drücken zum Würfeln"}</span>
     </div>
   );

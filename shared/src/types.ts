@@ -177,6 +177,9 @@ export const HAND_LIMIT_ON_SEVEN = 7; // more than this and you discard half on 
 // tell a player's message apart from an event the engine wrote.
 export const CHAT_PREFIX = "💬 ";
 export const CHAT_MAX_LENGTH = 160;
+// Physical pieces each player owns, classic Catan counts. City upgrades hand
+// the settlement token back, so the two are capped independently.
+export const PIECE_LIMITS = { settlement: 5, city: 4, road: 15 } as const;
 export const LONGEST_ROAD_MIN_LENGTH = 5;
 export const LARGEST_ARMY_MIN_KNIGHTS = 3;
 export const LONGEST_ROAD_BONUS = 2;

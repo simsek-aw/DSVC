@@ -15,6 +15,7 @@ import {
   LARGEST_ARMY_MIN_KNIGHTS,
   LONGEST_ROAD_BONUS,
   LONGEST_ROAD_MIN_LENGTH,
+  PIECE_LIMITS,
   Player,
   ResourceType,
   HAND_LIMIT_ON_SEVEN,
@@ -707,6 +708,8 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       if (!hasEnoughResources(player, BUILD_COSTS.road)) throw new GameError("Nicht genug Rohstoffe für eine Straße.");
       const ek = edgeKey(action.edge);
       if (state.roads.some((r) => edgeKey(r.edge) === ek)) throw new GameError("Straße bereits vorhanden.");
+      if (state.roads.filter((r) => r.ownerId === playerId).length >= PIECE_LIMITS.road)
+        throw new GameError("Keine Straßen mehr übrig.");
       if (!roadConnectsToOwnNetwork(state, playerId, action.edge))
         throw new GameError("Straße muss an dein Straßen- oder Siedlungsnetz anschließen.");
 
@@ -724,6 +727,8 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       if (!hasEnoughResources(player, BUILD_COSTS.settlement)) throw new GameError("Nicht genug Rohstoffe für eine Siedlung.");
       const vk = vertexKey(action.vertex);
       if (state.buildings.some((b) => vertexKey(b.vertex) === vk)) throw new GameError("Platz bereits belegt.");
+      if (state.buildings.filter((b) => b.ownerId === playerId && b.type === "settlement").length >= PIECE_LIMITS.settlement)
+        throw new GameError("Keine Siedlungen mehr übrig — baue eine bestehende zur Stadt aus.");
       const graph = buildBoardGraph(state.tiles, TILE_SIZE);
       const tooClose = vertexNeighborsOf(graph, action.vertex).some((n) =>
         state.buildings.some((b) => vertexKey(b.vertex) === vertexKey(n))
@@ -751,6 +756,8 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       const existing = state.buildings.find((b) => vertexKey(b.vertex) === vk);
       if (!existing || existing.ownerId !== playerId || existing.type !== "settlement")
         throw new GameError("Hier steht keine eigene Siedlung zum Ausbauen.");
+      if (state.buildings.filter((b) => b.ownerId === playerId && b.type === "city").length >= PIECE_LIMITS.city)
+        throw new GameError("Keine Städte mehr übrig.");
 
       let next = updatePlayer(state, playerId, (p) => payCost(p, BUILD_COSTS.city));
       next = {

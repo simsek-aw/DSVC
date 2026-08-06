@@ -1451,3 +1451,40 @@ body {
   0% { opacity: 0.75; }
   100% { opacity: 0; }
 }
+
+/* What you should do now, or who the game is waiting on. */
+.action-hint {
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.action-hint.you {
+  background: #14453f;
+  border: 1px solid #2a9d8f;
+  color: #d8f3ec;
+}
+
+.action-hint.waiting {
+  background: #1d2b3a;
+  border: 1px solid #3a5068;
+  color: #a8dadc;
+  font-weight: 500;
+}
+
+/* Remaining building stock. */
+.piece-tally {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  font-size: 0.82rem;
+  color: #cfe6df;
+  padding: 2px 0;
+}
+
+.piece-tally .depleted {
+  color: #6b8f94;
+  text-decoration: line-through;
+}

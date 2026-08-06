@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { GameState } from "@canos/shared";
+import { shareInvite } from "../invite";
 
 interface Props {
   state: GameState;
@@ -10,6 +12,18 @@ interface Props {
 
 export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: Props) {
   const isHost = state.players[0]?.id === myPlayerId;
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const [manualLink, setManualLink] = useState<string | null>(null);
+
+  const onShare = async () => {
+    const res = await shareInvite(roomId);
+    if (res.kind === "copied") {
+      setShareNote("Link kopiert! 📋");
+      setTimeout(() => setShareNote(null), 2500);
+    } else if (res.kind === "manual") {
+      setManualLink(res.url);
+    }
+  };
 
   return (
     <div className="lobby-screen">
@@ -17,6 +31,20 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
       <p className="subtitle">
         Raum-Code: <span className="room-code">{roomId}</span> — teile ihn mit deinen Mitspielern
       </p>
+
+      <button className="primary-button" onClick={onShare}>
+        🔗 Einladungslink teilen
+      </button>
+      {shareNote && <p className="hint">{shareNote}</p>}
+      {manualLink && (
+        <input
+          className="text-input"
+          readOnly
+          value={manualLink}
+          onFocus={(e) => e.currentTarget.select()}
+          aria-label="Einladungslink"
+        />
+      )}
 
       <ul className="player-list">
         {state.players.map((p) => (

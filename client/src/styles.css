@@ -1576,3 +1576,13 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+/* Invite banner in the lobby when opened from a share link. */
+.invite-note {
+  background: #14453f;
+  border: 1px solid #2a9d8f;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  color: #d8f3ec;
+}

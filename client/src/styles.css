@@ -1665,6 +1665,79 @@ body {
   font-weight: 700;
 }
 
+/* Secret mission card — only its owner sees it, tucked under the score row. */
+.secret-objective {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: #16323a;
+  border: 1px solid #2a6f7a;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.secret-objective.done {
+  border-color: #7ed957;
+  box-shadow: 0 0 0 1px #7ed957 inset;
+}
+.secret-objective-icon {
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+.secret-objective-body {
+  display: flex;
+  flex-direction: column;
+}
+.secret-objective-body strong {
+  font-size: 0.82rem;
+  color: #d7f0f2;
+}
+.secret-objective.done .secret-objective-body strong {
+  color: #a8f0a0;
+}
+
+/* Host-only room options in the waiting room. */
+.room-settings {
+  width: min(420px, 92vw);
+  margin: 6px auto 2px;
+  text-align: left;
+}
+.room-settings-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7fa6ab;
+  margin: 0 0 6px;
+}
+.room-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #142c30;
+  border: 1px solid #29525a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.room-toggle.readonly {
+  cursor: default;
+  opacity: 0.8;
+}
+.room-toggle input {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: #2a9d8f;
+}
+.room-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.room-toggle-text strong {
+  font-size: 0.88rem;
+}
+
 /* Discard-on-7 warning. */
 .hand-warning {
   background: #3f2a1d;
@@ -1711,14 +1784,30 @@ body {
   gap: 6px;
 }
 .victory-standings li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 8px 12px;
   border: 2px solid;
   border-radius: 10px;
   background: #142c30;
   font-size: 0.9rem;
+}
+.victory-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.victory-objective {
+  margin-top: 4px;
+  padding-left: calc(1.4em + 8px);
+  text-align: left;
+  font-size: 0.72rem;
+  color: #9db8bc;
+}
+.victory-objective .obj-done {
+  color: #7ed957;
+  font-weight: 700;
+}
+.victory-objective .obj-miss {
+  color: #6b8f94;
 }
 .victory-standings li.winner {
   box-shadow: 0 0 0 2px #f4d35e inset;

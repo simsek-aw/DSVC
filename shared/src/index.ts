@@ -36,6 +36,9 @@ export type {
   PendingSteal,
   GameState,
   ClientAction,
+  GameSettings,
+  SecretObjective,
+  SecretObjectiveId,
 } from "./types";
 export {
   RESOURCE_TYPES,
@@ -53,6 +56,8 @@ export {
   LARGEST_ARMY_MIN_KNIGHTS,
   LONGEST_ROAD_BONUS,
   LARGEST_ARMY_BONUS,
+  SECRET_OBJECTIVES,
+  defaultSettings,
 } from "./types";
 
 export type { MapGenOptions, GeneratedMap } from "./mapGenerator";
@@ -71,6 +76,7 @@ export {
   startGame,
   applyAction,
   totalVictoryPoints,
+  objectiveComplete,
   bestBankRatio,
   handSize,
   viewFor,

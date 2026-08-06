@@ -29,6 +29,10 @@ import {
   TERRAIN_NAMES_DE,
   Tile,
   VICTORY_POINTS_TO_WIN,
+  GameSettings,
+  SecretObjectiveId,
+  SECRET_OBJECTIVES,
+  defaultSettings,
 } from "./types";
 
 export const TILE_SIZE = 1;
@@ -91,6 +95,7 @@ export function createLobby(roomId: string): GameState {
     winnerId: null,
     roundCount: 0,
     weather: null,
+    settings: defaultSettings(),
     log: [],
   };
 }
@@ -108,6 +113,7 @@ export function addPlayer(state: GameState, playerId: string, name: string): Gam
     knightsPlayed: 0,
     victoryPoints: 0,
     turnOrderRoll: null,
+    objective: null,
   };
   return { ...state, players: [...state.players, player], log: [...state.log, `${name} ist beigetreten.`] };
 }
@@ -240,9 +246,16 @@ export function viewFor(state: GameState, playerId: string): GameState {
   // cards, so the answer never travels to a client that must not have it.
   const steal = state.pendingSteal;
   const pendingSteal = steal && steal.victimId !== playerId ? { ...steal, hand: [] } : steal;
+  // Missions stay face-down for everyone but their owner, until the game ends
+  // and the final tally reveals them.
+  const players =
+    state.phase === "ended"
+      ? state.players
+      : state.players.map((p) => (p.id === playerId ? p : { ...p, objective: null }));
   return {
     ...state,
     pendingSteal,
+    players,
     tiles: state.tiles.map((t) => {
       const scouted = t.scoutedBy.includes(playerId);
       if (t.revealed) return { ...t, scoutedBy: scouted ? [playerId] : [] };
@@ -264,13 +277,53 @@ export function startGame(state: GameState): GameState {
   if (state.phase !== "lobby") throw new GameError("Spiel wurde bereits gestartet.");
   if (state.players.length < 2) throw new GameError("Mindestens 2 Spieler nötig.");
   const { tiles } = generateMap({ playerCount: state.players.length, tileSize: TILE_SIZE });
+  // Deal one face-down mission per player when the room enabled them. The deck
+  // is reshuffled and cycled so every player gets one even at a full table.
+  let players = state.players;
+  const log = [...state.log, "Spiel gestartet. Alle würfeln um die Zugreihenfolge."];
+  if (state.settings.secretObjectives) {
+    const ids = shuffle(Object.keys(SECRET_OBJECTIVES) as SecretObjectiveId[]);
+    players = state.players.map((p, i) => ({ ...p, objective: ids[i % ids.length] }));
+    log.push("🎯 Geheime Aufträge wurden verteilt — nur du siehst deinen.");
+  }
   return {
     ...state,
     phase: "turnOrderRoll",
     tiles,
+    players,
     developmentDeck: buildDevelopmentDeck(),
-    log: [...state.log, "Spiel gestartet. Alle würfeln um die Zugreihenfolge."],
+    log,
   };
+}
+
+// Whether a player's secret mission is fulfilled, from board state alone so the
+// answer is deterministic and identical on server and (revealed) client.
+export function objectiveComplete(state: GameState, playerId: string): boolean {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player?.objective) return false;
+  const myBuildings = state.buildings.filter((b) => b.ownerId === playerId);
+  switch (player.objective) {
+    case "roadKing":
+      return longestRoadLength(state.roads, playerId) >= 7;
+    case "metropolis":
+      return myBuildings.filter((b) => b.type === "city").length >= 3;
+    case "warlord":
+      return player.knightsPlayed >= 3;
+    case "expander":
+      return myBuildings.length >= 7;
+    case "harborMaster": {
+      const myVerts = new Set(myBuildings.map((b) => b.vertex));
+      const ports = state.tiles.filter((t) => t.port).length;
+      if (ports === 0) return false;
+      let touched = 0;
+      for (const t of state.tiles) {
+        if (t.port && t.port.edgeVertices.some((v) => myVerts.has(v))) touched++;
+      }
+      return touched >= 2;
+    }
+    default:
+      return false;
+  }
 }
 
 function nextIndexSnake(state: GameState): { index: number; setupRound: 1 | 2; done: boolean } {
@@ -370,6 +423,7 @@ export function totalVictoryPoints(state: GameState, playerId: string): number {
   let total = player.victoryPoints;
   if (state.longestRoadPlayerId === playerId) total += LONGEST_ROAD_BONUS;
   if (state.largestArmyPlayerId === playerId) total += LARGEST_ARMY_BONUS;
+  if (player.objective && objectiveComplete(state, playerId)) total += SECRET_OBJECTIVES[player.objective].bonus;
   return total;
 }
 
@@ -1218,6 +1272,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       return {
         ...fresh,
         demoMode: state.demoMode,
+        settings: state.settings, // keep the host's room options across a restart
         players: state.players.map((p) => ({
           ...p,
           resources: emptyResources(),
@@ -1225,9 +1280,16 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
           knightsPlayed: 0,
           victoryPoints: 0,
           turnOrderRoll: null,
+          objective: null,
         })),
         log: [...state.log.slice(-40), "🔄 Neues Spiel — zurück in die Lobby."],
       };
+    }
+
+    case "setRoomSettings": {
+      if (state.phase !== "lobby") throw new GameError("Einstellungen nur in der Lobby änderbar.");
+      if (state.players[0]?.id !== playerId) throw new GameError("Nur der Host kann die Raum-Einstellungen ändern.");
+      return { ...state, settings: { ...state.settings, ...action.settings } };
     }
 
     default:

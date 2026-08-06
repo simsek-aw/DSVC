@@ -1,4 +1,4 @@
-import { GameState, totalVictoryPoints } from "@canos/shared";
+import { GameState, totalVictoryPoints, objectiveComplete, SECRET_OBJECTIVES } from "@canos/shared";
 
 interface Props {
   state: GameState;
@@ -28,17 +28,29 @@ export function VictoryScreen({ state, myPlayerId, sendAction, onLeave }: Props)
         <ol className="victory-standings">
           {ranked.map(({ p, vp }, i) => (
             <li key={p.id} className={p.id === state.winnerId ? "winner" : ""} style={{ borderColor: p.color }}>
-              <span className="victory-rank">{i + 1}.</span>
-              <span className="player-dot" style={{ background: p.color }} />
-              <span className="victory-name">
-                {p.name}
-                {p.id === myPlayerId && " (du)"}
-              </span>
-              <span className="victory-badges">
-                {state.longestRoadPlayerId === p.id && <span title="Längste Straße">🛣️</span>}
-                {state.largestArmyPlayerId === p.id && <span title="Größte Rittermacht">⚔️</span>}
-              </span>
-              <span className="victory-vp">{vp}</span>
+              <div className="victory-row">
+                <span className="victory-rank">{i + 1}.</span>
+                <span className="player-dot" style={{ background: p.color }} />
+                <span className="victory-name">
+                  {p.name}
+                  {p.id === myPlayerId && " (du)"}
+                </span>
+                <span className="victory-badges">
+                  {state.longestRoadPlayerId === p.id && <span title="Längste Straße">🛣️</span>}
+                  {state.largestArmyPlayerId === p.id && <span title="Größte Rittermacht">⚔️</span>}
+                </span>
+                <span className="victory-vp">{vp}</span>
+              </div>
+              {p.objective && (
+                <div className="victory-objective">
+                  🎯 {SECRET_OBJECTIVES[p.objective].title}
+                  {objectiveComplete(state, p.id) ? (
+                    <span className="obj-done"> ✓ +{SECRET_OBJECTIVES[p.objective].bonus}</span>
+                  ) : (
+                    <span className="obj-miss"> — nicht erfüllt</span>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ol>

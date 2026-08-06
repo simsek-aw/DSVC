@@ -21,6 +21,8 @@ import {
   longestRoadLength,
   tilesTouchingVertex,
   totalVictoryPoints,
+  objectiveComplete,
+  SECRET_OBJECTIVES,
 } from "@canos/shared";
 import { HexBoard, BuildMode, MapInfo, BoardApi } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
@@ -606,6 +608,21 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
         {overHandLimit && (
           <div className="hand-warning">⚠️ {myHand} Karten — bei einer 7 wirfst du die Hälfte ab!</div>
+        )}
+
+        {state.phase !== "lobby" && me?.objective && (
+          <div className={`secret-objective ${objectiveComplete(state, myPlayerId) ? "done" : ""}`} title="Nur du siehst deinen Auftrag">
+            <span className="secret-objective-icon">🎯</span>
+            <span className="secret-objective-body">
+              <strong>
+                {SECRET_OBJECTIVES[me.objective].title}
+                {objectiveComplete(state, myPlayerId) && " ✓"}
+              </strong>
+              <span className="hint">
+                {SECRET_OBJECTIVES[me.objective].desc} · +{SECRET_OBJECTIVES[me.objective].bonus} versteckte SP
+              </span>
+            </span>
+          </div>
         )}
 
         {/* My remaining stock of pieces. */}

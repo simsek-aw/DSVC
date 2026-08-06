@@ -59,6 +59,22 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
 
       <p className="hint">{state.players.length} / 6 Spieler</p>
 
+      <div className="room-settings">
+        <p className="room-settings-title">Zusatzregeln</p>
+        <label className={`room-toggle ${!isHost ? "readonly" : ""}`}>
+          <input
+            type="checkbox"
+            checked={state.settings.secretObjectives}
+            disabled={!isHost}
+            onChange={(e) => sendAction({ type: "setRoomSettings", settings: { secretObjectives: e.target.checked } })}
+          />
+          <span className="room-toggle-text">
+            <strong>🎯 Geheime Aufträge</strong>
+            <span className="hint">Jeder bekommt eine verdeckte Mission für versteckte Siegpunkte.</span>
+          </span>
+        </label>
+      </div>
+
       {isHost ? (
         <button className="primary-button" disabled={state.players.length < 2} onClick={() => sendAction({ type: "startGame" })}>
           Spiel starten

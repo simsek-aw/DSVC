@@ -70,6 +70,40 @@ export interface Player {
   knightsPlayed: number;
   victoryPoints: number; // from settlements/cities only — longest road & largest army are added on top when computing totals
   turnOrderRoll: DiceRoll | null;
+  // A face-down mission dealt at game start when the room enables them. Only the
+  // owner ever sees it (viewFor blanks it for everyone else until the game ends);
+  // when its condition is met it silently adds hidden victory points.
+  objective: SecretObjectiveId | null;
+}
+
+// Hidden missions. Each is checkable purely from board state so scoring is
+// deterministic, and each grants extra victory points nobody else can see coming.
+export type SecretObjectiveId = "roadKing" | "metropolis" | "warlord" | "expander" | "harborMaster";
+
+export interface SecretObjective {
+  id: SecretObjectiveId;
+  title: string;
+  desc: string;
+  bonus: number; // hidden victory points once complete
+}
+
+export const SECRET_OBJECTIVES: Record<SecretObjectiveId, SecretObjective> = {
+  roadKing: { id: "roadKing", title: "Straßenkönig", desc: "Halte eine Straße mit Länge ≥ 7", bonus: 2 },
+  metropolis: { id: "metropolis", title: "Metropole", desc: "Besitze 3 Städte", bonus: 2 },
+  warlord: { id: "warlord", title: "Kriegsherr", desc: "Spiele 3 Ritter", bonus: 1 },
+  expander: { id: "expander", title: "Weitläufig", desc: "Besitze 7 Bauwerke (Siedlungen + Städte)", bonus: 2 },
+  harborMaster: { id: "harborMaster", title: "Hafenmeister", desc: "Sitze an mindestens 2 Häfen", bonus: 2 },
+};
+
+// Room options the host locks in before starting. Both default off so a plain
+// game plays exactly as before; each unlocks one extra layer of strategy.
+export interface GameSettings {
+  secretObjectives: boolean; // deal each player a hidden mission worth extra VP
+  specialBuildings: boolean; // reserved for the special-buildings layer
+}
+
+export function defaultSettings(): GameSettings {
+  return { secretObjectives: false, specialBuildings: false };
 }
 
 export type GamePhase =
@@ -176,6 +210,7 @@ export interface GameState {
   // player), and the island event in force for the current round, if any.
   roundCount: number;
   weather: WeatherEvent | null;
+  settings: GameSettings;
   log: string[];
 }
 
@@ -240,4 +275,5 @@ export type ClientAction =
   | { type: "setNegotiationConfirmed"; confirmed: boolean }
   | { type: "cancelNegotiation" }
   | { type: "endTurn" }
-  | { type: "restartGame" };
+  | { type: "restartGame" }
+  | { type: "setRoomSettings"; settings: Partial<GameSettings> };

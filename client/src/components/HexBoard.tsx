@@ -141,6 +141,14 @@ export function HexBoard({
   };
 
   const px = (coord: AxialCoord) => axialToPixel(coord, view.scale);
+  const me = state.players.find((p) => p.id === myPlayerId);
+
+  // When a number is rolled (not a 7), every matching tile flashes once. The key
+  // changes with each roll so React remounts the flash and the animation replays,
+  // even when the same number comes up twice in a row.
+  const roll = state.lastDiceRoll;
+  const harvestValue = roll && roll.total !== 7 ? roll.total : null;
+  const harvestKey = roll ? `${roll.die1}-${roll.die2}-${state.currentPlayerIndex}` : "";
 
   const canAffordRoad = affordable(state, myPlayerId, "road");
   const canAffordSettlement = affordable(state, myPlayerId, "settlement");
@@ -198,6 +206,8 @@ export function HexBoard({
               scouted={tile.scoutedBy.includes(myPlayerId)}
               onClickTile={() => handleTileClick(tile)}
               onInspect={inspect}
+              harvesting={harvestValue !== null && tile.numberRevealed && tile.numberToken === harvestValue}
+              harvestKey={harvestKey}
             />
           );
         })}
@@ -272,17 +282,20 @@ export function HexBoard({
                   }
                 />
               )}
+              {/* Ghost preview of what a tap would build here. */}
+              {clickable && buildMode && buildMode !== "roadBuilding" && (
+                <g className="build-ghost">
+                  <BuildingSprite
+                    type={buildMode === "city" ? "city" : "settlement"}
+                    cx={p.x}
+                    cy={p.y}
+                    size={view.scale}
+                    color={me?.color ?? "#fff"}
+                  />
+                </g>
+              )}
               {building && (
-                <rect
-                  x={p.x - view.scale * 0.12}
-                  y={p.y - view.scale * 0.12}
-                  width={view.scale * 0.24}
-                  height={view.scale * 0.24}
-                  fill={owner?.color ?? "#fff"}
-                  stroke="#111"
-                  strokeWidth={1.5}
-                  rx={building.type === "city" ? 2 : 8}
-                />
+                <BuildingSprite type={building.type} cx={p.x} cy={p.y} size={view.scale} color={owner?.color ?? "#fff"} />
               )}
             </g>
           );
@@ -318,18 +331,13 @@ export function HexBoard({
 
         {state.roads.map((road) => {
           const owner = state.players.find((p) => p.id === road.ownerId);
-          const a = scalePoint(road.edge.a, view.scale);
-          const b = scalePoint(road.edge.b, view.scale);
           return (
-            <line
+            <RoadPlanks
               key={edgeKey(road.edge)}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              stroke={owner?.color ?? "#fff"}
-              strokeWidth={Math.max(3, view.scale * 0.08)}
-              strokeLinecap="round"
+              a={scalePoint(road.edge.a, view.scale)}
+              b={scalePoint(road.edge.b, view.scale)}
+              size={view.scale}
+              color={owner?.color ?? "#fff"}
             />
           );
         })}
@@ -613,6 +621,84 @@ function scalePoint(v: VertexId, scale: number) {
   return { x: v.x * scale, y: v.y * scale };
 }
 
+/** Darkens a hex colour for outlines and shading, keeping it in the same hue. */
+function shade(hex: string, factor: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.round(((n >> 16) & 255) * factor);
+  const g = Math.round(((n >> 8) & 255) * factor);
+  const b = Math.round((n & 255) * factor);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+/**
+ * A settlement (little house) or city (twin-towered keep), drawn as pixel-ish
+ * rectangles in the owner's colour with a darker roof and outline. Sits centred
+ * on a board vertex; no rotation needed.
+ */
+function BuildingSprite({ type, cx, cy, size, color }: { type: "settlement" | "city"; cx: number; cy: number; size: number; color: string }) {
+  const dark = shade(color, 0.55);
+  const roof = shade(color, 0.72);
+  const sw = Math.max(1, size * 0.025);
+  if (type === "city") {
+    // A squat keep with a battlemented top: reads as "bigger/stronger" even small.
+    const w = size * 0.42;
+    const h = size * 0.26;
+    const x = cx - w / 2;
+    const y = cy - h * 0.4;
+    const m = w / 5; // merlon width — three teeth, two gaps
+    return (
+      <g stroke={dark} strokeWidth={sw} strokeLinejoin="round">
+        <rect x={x} y={y} width={w} height={h} fill={color} />
+        {/* battlements */}
+        <rect x={x} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
+        <rect x={cx - m / 2} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
+        <rect x={x + w - m} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
+        {/* gate */}
+        <rect x={cx - w * 0.12} y={y + h * 0.35} width={w * 0.24} height={h * 0.65} fill={dark} />
+      </g>
+    );
+  }
+  // A plain house: square body the same width as its gable roof, no overhang,
+  // so it never reads as an arrow.
+  const w = size * 0.26;
+  const bodyH = size * 0.23;
+  const roofH = size * 0.12;
+  const x = cx - w / 2;
+  const y = cy - bodyH * 0.4;
+  return (
+    <g stroke={dark} strokeWidth={sw} strokeLinejoin="round">
+      <rect x={x} y={y} width={w} height={bodyH} fill={color} />
+      <polygon points={`${x - sw},${y + sw} ${cx},${y - roofH} ${x + w + sw},${y + sw}`} fill={shade(color, 0.58)} />
+      <rect x={cx - w * 0.17} y={y + bodyH * 0.42} width={w * 0.34} height={bodyH * 0.58} fill={dark} />
+    </g>
+  );
+}
+
+/**
+ * A road drawn as a short run of wooden planks in the owner's colour: a dark
+ * base gives it an outline, then two lighter fills leave a seam down the middle
+ * and cross-ties suggest the boards.
+ */
+function RoadPlanks({ a, b, size, color }: { a: { x: number; y: number }; b: { x: number; y: number }; size: number; color: string }) {
+  const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  const w = Math.max(3, size * 0.11);
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dark = shade(color, 0.55);
+  const ties = Math.max(2, Math.round(len / (size * 0.28)));
+  return (
+    <g transform={`translate(${mx}, ${my}) rotate(${angle})`}>
+      <rect x={-len / 2} y={-w / 2} width={len} height={w} fill={dark} rx={w * 0.3} />
+      <rect x={-len / 2 + w * 0.15} y={-w / 2 + w * 0.15} width={len - w * 0.3} height={w * 0.7} fill={color} rx={w * 0.2} />
+      {Array.from({ length: ties - 1 }, (_, i) => {
+        const x = -len / 2 + (len / ties) * (i + 1);
+        return <rect key={i} x={x - w * 0.06} y={-w / 2} width={w * 0.12} height={w} fill={dark} />;
+      })}
+    </g>
+  );
+}
+
 function affordable(state: GameState, playerId: string, cost: "road" | "settlement" | "city"): boolean {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return false;
@@ -627,6 +713,8 @@ function TilePiece({
   scouted,
   onClickTile,
   onInspect,
+  harvesting,
+  harvestKey,
 }: {
   tile: Tile;
   center: { x: number; y: number };
@@ -634,6 +722,8 @@ function TilePiece({
   scouted: boolean;
   onClickTile: () => void;
   onInspect?: (info: MapInfo) => void;
+  harvesting: boolean;
+  harvestKey: string;
 }) {
   const points = tilePolygonPoints(center, size * 0.97);
   // A scouted tile shows its terrain only to the player who paid for the look,
@@ -655,6 +745,9 @@ function TilePiece({
         strokeWidth={1.5}
         strokeDasharray={scouted && !tile.revealed ? "4 3" : undefined}
       />
+      {harvesting && (
+        <polygon key={harvestKey} className="harvest-pulse" points={points} pointerEvents="none" />
+      )}
       {!tile.revealed && !scouted && (
         <text
           x={center.x}

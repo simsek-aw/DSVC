@@ -1424,3 +1424,30 @@ body {
   color: #f1faee;
   font-weight: 600;
 }
+
+/* Ghost of the piece a tap would build, gently pulsing at legal spots. */
+.build-ghost {
+  opacity: 0.5;
+  pointer-events: none;
+  animation: build-ghost-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes build-ghost-pulse {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.62; }
+}
+
+/* One-shot flash on every tile that just produced. */
+.harvest-pulse {
+  fill: #fff;
+  stroke: #fff8c4;
+  stroke-width: 3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: harvest-flash 0.75s ease-out forwards;
+}
+
+@keyframes harvest-flash {
+  0% { opacity: 0.75; }
+  100% { opacity: 0; }
+}

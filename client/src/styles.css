@@ -524,21 +524,16 @@ body {
   pointer-events: none;
 }
 
-/* The harvested resource sprite flies down from the board into the chip. */
-.gain-fly {
-  display: inline-flex;
-  animation: gain-fly-in 0.6s ease-out both;
-}
-
-@keyframes gain-fly-in {
-  0% {
-    opacity: 0;
-    transform: translateY(-70px) scale(1.4);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+/* A resource sprite mid-flight from its tile to the resource chip. Positioned
+   at the viewport origin; the Web Animation translates it by absolute pixels,
+   and the -11px offset centres a 22px sprite on the target point. */
+.fly-sprite {
+  position: fixed;
+  left: -11px;
+  top: -11px;
+  pointer-events: none;
+  z-index: 900;
+  will-change: transform, opacity;
 }
 
 @keyframes gain-float-up {

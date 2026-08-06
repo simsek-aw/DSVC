@@ -29,6 +29,13 @@ interface Props {
   freeRoadEdges?: EdgeId[];
   onSelectFreeRoadEdge?: (edge: EdgeId) => void;
   onInspect?: (info: MapInfo | null) => void;
+  boardRef?: React.MutableRefObject<BoardApi | null>;
+}
+
+/** A small handle GameView uses to place harvest sprites over the right tile. */
+export interface BoardApi {
+  /** Viewport pixel position of a tile's centre, or null if the board isn't mounted. */
+  getTileScreenPos(coord: AxialCoord): { x: number; y: number } | null;
 }
 
 /** Short explanation of a map element, shown when the player taps it. */
@@ -70,9 +77,24 @@ export function HexBoard({
   freeRoadEdges,
   onSelectFreeRoadEdge,
   onInspect,
+  boardRef,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ scale: 48, x: 0, y: 0 });
+
+  // Expose the current tile→screen mapping so the harvest fly can start on the
+  // exact tile. Reassigned every render, so it always uses the latest pan/zoom.
+  if (boardRef) {
+    boardRef.current = {
+      getTileScreenPos(coord: AxialCoord) {
+        const svg = svgRef.current;
+        if (!svg) return null;
+        const rect = svg.getBoundingClientRect();
+        const p = axialToPixel(coord, view.scale);
+        return { x: rect.left + view.x + svg.clientWidth / 2 + p.x, y: rect.top + view.y + svg.clientHeight / 2 + p.y };
+      },
+    };
+  }
 
   // Pointer Events alone (no separate legacy Touch Events) unify mouse, touch
   // and pen across modern browsers — mixing both APIs on the same element is
@@ -225,7 +247,7 @@ export function HexBoard({
               scouted={tile.scoutedBy.includes(myPlayerId)}
               onClickTile={() => handleTileClick(tile)}
               onInspect={inspect}
-              harvesting={harvestValue !== null && tile.numberRevealed && tile.numberToken === harvestValue}
+              harvesting={harvestValue !== null && tile.revealed && tile.numberRevealed && tile.numberToken === harvestValue}
               harvestKey={harvestKey}
             />
           );

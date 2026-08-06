@@ -11,9 +11,13 @@ import {
   ResourceType,
   RESOURCE_TYPES,
   SCOUT_COST,
+  TILE_SIZE,
+  axialKey,
   bestBankRatio,
+  buildBoardGraph,
+  tilesTouchingVertex,
 } from "@canos/shared";
-import { HexBoard, BuildMode, MapInfo } from "./HexBoard";
+import { HexBoard, BuildMode, MapInfo, BoardApi } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
 import { ResourceSprite, PixelDie } from "./PixelIcons";
@@ -43,6 +47,39 @@ const RESOURCE_NAMES: Record<ResourceType, string> = {
 
 // Leading emojis the engine puts on "big play" log lines worth a popup.
 const ANNOUNCE_EMOJIS = ["⚔️", "🏅", "🛣️", "📈", "💡", "🛤️", "💰"];
+
+// A resource sprite in flight from a producing tile to its resource chip.
+interface Flight {
+  id: string;
+  resource: ResourceType;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+const FLIGHT_MS = 620;
+
+function FlyingSprite({ flight }: { flight: Flight }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !el.animate) return;
+    const anim = el.animate(
+      [
+        { transform: `translate(${flight.x0}px, ${flight.y0}px) scale(1.35)`, opacity: 0 },
+        { opacity: 1, offset: 0.18 },
+        { transform: `translate(${flight.x1}px, ${flight.y1}px) scale(0.65)`, opacity: 0.85 },
+      ],
+      { duration: FLIGHT_MS, easing: "cubic-bezier(.4,.02,.4,1)", fill: "forwards" },
+    );
+    return () => anim.cancel();
+  }, []);
+  return (
+    <div ref={ref} className="fly-sprite">
+      <ResourceSprite resource={flight.resource} size={22} />
+    </div>
+  );
+}
 
 const WEATHER_INFO: Record<string, { icon: string; title: string }> = {
   bounty: { icon: "☀️", title: "Reiche Ernte" },
@@ -145,11 +182,15 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
   const [turnPopup, setTurnPopup] = useState<string | null>(null);
   const [gains, setGains] = useState<{ id: string; resource: ResourceType; amount: number }[]>([]);
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const boardApiRef = useRef<BoardApi | null>(null);
+  const chipRefs = useRef<Partial<Record<ResourceType, HTMLDivElement | null>>>({});
   const lastRollKeyRef = useRef<string>("");
   const prevPlayerIndexRef = useRef<number | null>(null);
   const prevResourcesRef = useRef(me?.resources);
   const notifiedRef = useRef(false);
   const logSeenRef = useRef(state.log.length);
+  const prodRollRef = useRef<string>("");
 
   // Big plays (knight, monopoly, longest road, …) get the same popup treatment
   // as a dice roll. The engine tags those log lines with a leading emoji, so a
@@ -248,23 +289,75 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     prevPlayerIndexRef.current = state.currentPlayerIndex;
   }, [state.currentPlayerIndex, state.phase]);
 
-  // Floating "+N" indicators anchored above whichever resource actually
-  // increased (dice production, trades, dev cards, ...).
+  // Builds one flight per producing building-tile pair I own for the rolled
+  // number: a sprite from the tile's screen position to its resource chip.
+  const spawnHarvestFlights = (total: number): Flight[] => {
+    const api = boardApiRef.current;
+    if (!api) return [];
+    const graph = buildBoardGraph(state.tiles, TILE_SIZE);
+    const out: Flight[] = [];
+    for (const b of state.buildings) {
+      if (b.ownerId !== myPlayerId) continue;
+      for (const coord of tilesTouchingVertex(graph, b.vertex)) {
+        const tile = state.tiles.find((t) => axialKey(t.coord) === axialKey(coord));
+        if (!tile || !tile.revealed || tile.hasClassicRobber) continue;
+        if (tile.numberToken !== total || tile.terrain === "desert" || tile.terrain === "unknown") continue;
+        const from = api.getTileScreenPos(tile.coord);
+        const chip = chipRefs.current[tile.terrain as ResourceType]?.getBoundingClientRect();
+        if (!from || !chip) continue;
+        const count = b.type === "city" ? 2 : 1; // a city pulls twice as much
+        for (let i = 0; i < count; i++) {
+          out.push({
+            id: `${Date.now()}-${axialKey(tile.coord)}-${b.type}-${i}-${Math.random()}`,
+            resource: tile.terrain as ResourceType,
+            x0: from.x,
+            y0: from.y,
+            x1: chip.x + chip.width / 2,
+            y1: chip.y + chip.height / 2,
+          });
+        }
+      }
+    }
+    return out;
+  };
+
+  // Resource gains: a floating "+N" per resource that increased. When the gain
+  // comes from dice production, a sprite first flies out of each producing tile
+  // into the matching resource, and the "+N" only pops once it lands.
   useEffect(() => {
     if (!me) return;
     const prev = prevResourcesRef.current;
-    if (prev) {
-      const newGains: { id: string; resource: ResourceType; amount: number }[] = [];
-      for (const r of RESOURCE_TYPES) {
-        const diff = me.resources[r] - (prev[r] ?? 0);
-        if (diff > 0) newGains.push({ id: `${Date.now()}-${r}-${Math.random()}`, resource: r, amount: diff });
-      }
-      if (newGains.length > 0) {
-        setGains((g) => [...g, ...newGains]);
-        newGains.forEach((g) => setTimeout(() => setGains((cur) => cur.filter((x) => x.id !== g.id)), 1600));
-      }
-    }
     prevResourcesRef.current = me.resources;
+    if (!prev) return;
+
+    const newGains: { id: string; resource: ResourceType; amount: number }[] = [];
+    for (const r of RESOURCE_TYPES) {
+      const diff = me.resources[r] - (prev[r] ?? 0);
+      if (diff > 0) newGains.push({ id: `${Date.now()}-${r}-${Math.random()}`, resource: r, amount: diff });
+    }
+    if (newGains.length === 0) return;
+
+    const showGains = () => {
+      setGains((g) => [...g, ...newGains]);
+      newGains.forEach((g) => setTimeout(() => setGains((cur) => cur.filter((x) => x.id !== g.id)), 1600));
+    };
+
+    // Is this a dice harvest? Then start the flights from the actual tiles.
+    const roll = state.lastDiceRoll;
+    const rollKey = roll ? `${roll.die1}-${roll.die2}-${state.currentPlayerIndex}` : "";
+    const isProduction = !!roll && roll.total !== 7 && rollKey !== prodRollRef.current;
+    const spawned = isProduction ? spawnHarvestFlights(roll!.total) : [];
+
+    if (spawned.length > 0) {
+      prodRollRef.current = rollKey;
+      setFlights((f) => [...f, ...spawned]);
+      spawned.forEach((fl) => setTimeout(() => setFlights((cur) => cur.filter((x) => x.id !== fl.id)), FLIGHT_MS + 60));
+      // The count lands with the sprites.
+      const t = setTimeout(showGains, FLIGHT_MS - 80);
+      return () => clearTimeout(t);
+    }
+    // Non-harvest gains (trade, dev card, treasure): show the count right away.
+    showGains();
   }, [me?.resources]);
 
   const latestLogEntry = state.log[state.log.length - 1] ?? "";
@@ -292,6 +385,9 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
   return (
     <div className="game-root">
+      {flights.map((f) => (
+        <FlyingSprite key={f.id} flight={f} />
+      ))}
       <NegotiationTable state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
       <DiscardPanel state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
       <StealPanel state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
@@ -309,6 +405,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           freeRoadEdges={buildMode === "roadBuilding" ? freeRoadEdges : undefined}
           onSelectFreeRoadEdge={onSelectFreeRoadEdge}
           onInspect={setMapInfo}
+          boardRef={boardApiRef}
         />
         {mapInfo && (
           <div className="map-info-card" onClick={() => setMapInfo(null)}>
@@ -512,6 +609,9 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             {RESOURCE_TYPES.map((key) => (
               <div
                 key={key}
+                ref={(el) => {
+                  chipRefs.current[key] = el;
+                }}
                 className={`resource-chip ${request?.resource === key && iAmRequester ? "requested" : ""}`}
                 title={`${RESOURCE_LABELS[key]} — doppelt tippen, um danach zu fragen`}
                 onPointerDown={() => onResourceTap(key)}
@@ -520,11 +620,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                   .filter((g) => g.resource === key)
                   .map((g) => (
                     <span key={g.id} className="gain-indicator">
-                      {/* Sprite drops in from above the panel, as if flying in
-                          from the board, then settles onto the chip. */}
-                      <span className="gain-fly">
-                        <ResourceSprite resource={key} size={20} />
-                      </span>
                       +{g.amount}
                     </span>
                   ))}

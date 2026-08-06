@@ -9,6 +9,9 @@ import {
   CHAT_PREFIX,
   ClientAction,
   DevelopmentCardType,
+  EVENT_EVERY_ROUNDS,
+  WeatherEvent,
+  WeatherKind,
   DiceRoll,
   GameState,
   LARGEST_ARMY_BONUS,
@@ -85,6 +88,8 @@ export function createLobby(roomId: string): GameState {
     pendingSteal: null,
     demoMode: false,
     winnerId: null,
+    roundCount: 0,
+    weather: null,
     log: [],
   };
 }
@@ -332,15 +337,20 @@ function producersForTile(state: GameState, tile: Tile): Building[] {
 
 function produceResources(state: GameState, total: number): GameState {
   let next = state;
+  const weather = state.weather;
+  const bountyOn = weather?.kind === "bounty" && weather.number === total;
   for (const tile of state.tiles) {
     if (tile.numberToken !== total) continue;
     if (tile.hasClassicRobber) continue;
     if (tile.terrain === "desert") continue;
     const resource = tile.terrain as ResourceType;
+    // Drought: this terrain simply produces nothing for the round.
+    if (weather?.kind === "drought" && weather.terrain === resource) continue;
     const isBribed = next.briberyTileCoord && axialKey(next.briberyTileCoord) === axialKey(tile.coord);
     for (const b of producersForTile(next, tile)) {
       const baseAmount = b.type === "city" ? 2 : 1;
-      const finalAmount = tile.hasBoostToken ? baseAmount * 2 : baseAmount;
+      const boosted = tile.hasBoostToken ? baseAmount * 2 : baseAmount;
+      const finalAmount = bountyOn ? boosted * 2 : boosted;
       const recipientId = isBribed && next.briberyBeneficiaryId ? next.briberyBeneficiaryId : b.ownerId;
       if (isBribed) next = { ...next, log: [...next.log, `Bestochener Räuber leitet die Ernte auf einem ${TERRAIN_NAMES_DE[resource]}-Feld um!`] };
       if (tile.hasBoostToken) next = { ...next, log: [...next.log, `Boost-Figur verdoppelt die Ernte auf einem ${TERRAIN_NAMES_DE[resource]}-Feld!`] };
@@ -458,11 +468,47 @@ function playerPortRatios(state: GameState, playerId: string): { resource: Resou
 
 export function bestBankRatio(state: GameState, playerId: string, resource: ResourceType): number {
   let best = 4;
-  for (const p of playerPortRatios(state, playerId)) {
-    if (p.resource === resource) best = Math.min(best, 2);
-    else if (p.resource === "any") best = Math.min(best, 3);
+  // A storm shuts the harbours for the round — no port rates, only 4:1.
+  if (state.weather?.kind !== "storm") {
+    for (const p of playerPortRatios(state, playerId)) {
+      if (p.resource === resource) best = Math.min(best, 2);
+      else if (p.resource === "any") best = Math.min(best, 3);
+    }
   }
+  // A trade fair makes the bank one cheaper across the board (never below 2:1).
+  if (state.weather?.kind === "fair") best = Math.max(2, best - 1);
   return best;
+}
+
+// Draws the island event for a new event-round. Bounty and drought need a live
+// target, so they pick from what's actually on the board.
+function drawWeather(state: GameState): WeatherEvent {
+  const kinds: WeatherKind[] = ["bounty", "drought", "fair", "storm"];
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  if (kind === "bounty") {
+    const nums = Array.from(new Set(state.tiles.filter((t) => t.numberToken != null && t.terrain !== "desert").map((t) => t.numberToken!)));
+    if (nums.length === 0) return { kind: "fair" };
+    return { kind, number: nums[Math.floor(Math.random() * nums.length)] };
+  }
+  if (kind === "drought") {
+    const terrains = Array.from(new Set(state.tiles.filter((t) => t.terrain !== "desert" && t.terrain !== "unknown").map((t) => t.terrain as ResourceType)));
+    if (terrains.length === 0) return { kind: "fair" };
+    return { kind, terrain: terrains[Math.floor(Math.random() * terrains.length)] };
+  }
+  return { kind };
+}
+
+function describeWeather(w: WeatherEvent): string {
+  switch (w.kind) {
+    case "bounty":
+      return `☀️ Reiche Ernte: Die ${w.number} liefert diese Runde doppelt!`;
+    case "drought":
+      return `🌵 Dürre: ${TERRAIN_NAMES_DE[w.terrain as ResourceType]} liefert diese Runde nichts.`;
+    case "fair":
+      return "🧭 Fernhandel: Bank-Tausch ist diese Runde 1 günstiger.";
+    case "storm":
+      return "🌊 Sturm: Die Häfen sind diese Runde gesperrt (nur 4:1).";
+  }
 }
 
 // Log and chat share one stream, and a long game plus chatter would otherwise
@@ -1125,7 +1171,31 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       if (Object.keys(state.pendingDiscards).length > 0) throw new GameError("Es müssen noch Karten abgeworfen werden.");
       if (state.pendingSteal) throw new GameError("Der Raubzug ist noch nicht abgeschlossen.");
       const nextIndex = (state.currentPlayerIndex + 1) % state.turnOrder.length;
-      return { ...state, currentPlayerIndex: nextIndex, lastDiceRoll: null, robberTileCoord: null, pendingTrade: null, resourceRequest: null };
+      let roundCount = state.roundCount;
+      let weather = state.weather;
+      let log = state.log;
+      // A full round has passed once play wraps back to the first player.
+      if (nextIndex === 0) {
+        roundCount += 1;
+        if (roundCount % EVENT_EVERY_ROUNDS === 0) {
+          weather = drawWeather(state);
+          log = [...log, describeWeather(weather)];
+        } else if (weather) {
+          weather = null;
+          log = [...log, "Das Wetter beruhigt sich wieder. ⛅"];
+        }
+      }
+      return {
+        ...state,
+        currentPlayerIndex: nextIndex,
+        roundCount,
+        weather,
+        log,
+        lastDiceRoll: null,
+        robberTileCoord: null,
+        pendingTrade: null,
+        resourceRequest: null,
+      };
     }
 
     default:

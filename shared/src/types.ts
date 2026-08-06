@@ -119,6 +119,18 @@ export interface PendingSteal {
   handCount: number;
 }
 
+// Island events drawn every few rounds, lasting exactly one round. Kept
+// deliberately simple: each effect touches a single, well-defined spot
+// (production or the bank ratio), so it can't quietly unbalance the game.
+export type WeatherKind = "bounty" | "drought" | "fair" | "storm";
+export interface WeatherEvent {
+  kind: WeatherKind;
+  number?: number; // bounty: this rolled number pays double this round
+  terrain?: ResourceType; // drought: this terrain yields nothing this round
+}
+
+export const EVENT_EVERY_ROUNDS = 3;
+
 export interface Negotiation {
   id: string;
   initiatorId: string;
@@ -160,6 +172,10 @@ export interface GameState {
   // the whole game (including both sides of a trade) without a second phone.
   demoMode: boolean;
   winnerId: string | null;
+  // Full turns completed (incremented whenever play wraps back to the first
+  // player), and the island event in force for the current round, if any.
+  roundCount: number;
+  weather: WeatherEvent | null;
   log: string[];
 }
 

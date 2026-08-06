@@ -40,6 +40,29 @@ const RESOURCE_NAMES: Record<ResourceType, string> = {
   sheep: "Wolle",
 };
 
+const WEATHER_INFO: Record<string, { icon: string; title: string }> = {
+  bounty: { icon: "☀️", title: "Reiche Ernte" },
+  drought: { icon: "🌵", title: "Dürre" },
+  fair: { icon: "🧭", title: "Fernhandel" },
+  storm: { icon: "🌊", title: "Sturm" },
+};
+
+// Mirrors the engine's log wording, so the tap-to-explain card reads the same.
+function describeWeather(w: NonNullable<GameState["weather"]>): string {
+  switch (w.kind) {
+    case "bounty":
+      return `Die ${w.number} liefert diese Runde die doppelte Ernte — für alle.`;
+    case "drought":
+      return `${RESOURCE_NAMES[w.terrain as ResourceType]} liefert diese Runde nichts.`;
+    case "fair":
+      return "Bank-Tausch ist diese Runde 1 günstiger (nie unter 2:1).";
+    case "storm":
+      return "Die Häfen sind diese Runde gesperrt — es gilt nur der 4:1-Bankkurs.";
+    default:
+      return "";
+  }
+}
+
 const CARD_LABELS: Record<DevelopmentCardType, string> = {
   knight: "⚔️ Ritter",
   roadBuilding: "🛤️ Straßenbau",
@@ -146,6 +169,19 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       }
     }
   }, [myTurnActive]);
+
+  // Pop a big announcement whenever the island event changes.
+  const weatherKeyRef = useRef<string>("");
+  useEffect(() => {
+    const key = state.weather ? `${state.weather.kind}-${state.roundCount}` : "";
+    if (key && key !== weatherKeyRef.current) {
+      weatherKeyRef.current = key;
+      setTurnPopup(`${WEATHER_INFO[state.weather!.kind].icon} ${WEATHER_INFO[state.weather!.kind].title}!`);
+      const t = setTimeout(() => setTurnPopup(null), 2800);
+      return () => clearTimeout(t);
+    }
+    if (!key) weatherKeyRef.current = "";
+  }, [state.weather, state.roundCount]);
 
   // Put the title back the moment the player looks at the tab again.
   useEffect(() => {
@@ -307,6 +343,16 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           {state.phase === "mainGame" && <span>Am Zug: {currentPlayer?.name}</span>}
           {state.phase === "ended" && <span>{state.players.find((p) => p.id === state.winnerId)?.name} hat gewonnen! 🏆</span>}
         </div>
+        {state.weather && (
+          <button
+            className="weather-banner"
+            onClick={() => setMapInfo({ title: WEATHER_INFO[state.weather!.kind].title, text: describeWeather(state.weather!) })}
+            title="Ereignis dieser Runde — antippen für Details"
+          >
+            <span className="weather-icon">{WEATHER_INFO[state.weather.kind].icon}</span>
+            <span>{WEATHER_INFO[state.weather.kind].title}</span>
+          </button>
+        )}
         {buildMode === "knight" && <div className="mode-hint">Wähle ein Feld für den Ritter-Räuber</div>}
         {buildMode === "scout" && (
           <div className="mode-hint">Wähle ein verdecktes Nachbarfeld — nur du siehst, was dort liegt</div>

@@ -1488,3 +1488,27 @@ body {
   color: #6b8f94;
   text-decoration: line-through;
 }
+
+/* Island event in force this round — tap for details. */
+.weather-banner {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(20, 40, 55, 0.92);
+  border: 1px solid #6aa9d9;
+  color: #eaf4ff;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: calc(100% - 24px);
+}
+
+.weather-icon {
+  font-size: 1rem;
+}

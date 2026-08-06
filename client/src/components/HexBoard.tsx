@@ -316,51 +316,30 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
 // Hand-built pixel-art sea, in the spirit of classic blocky water tiles but
 // drawn from scratch (and darkened) so it sits under the board without
 // competing with the terrain colours.
-// Palette taken from the reference: light cyan channels running between
-// medium-blue swells, with pale flecks where the channels meet.
-const WATER_CHANNEL = "#7cc0e0";
-const WATER_BLOB = "#5583cf";
-const WATER_BLOB_ALT = "#6a97dc";
-const WATER_FOAM = "#dcecf9";
+// Water in the style of old handheld Pokémon games: a flat mid-blue sea with
+// small light wave crests scattered over it, drawn from a tiny palette.
+const WATER_BASE = "#3f7ad0";
+const WATER_DEEP = "#3162ad";
+const WATER_CREST = "#7fb8f0";
+const WATER_FOAM = "#c3e2ff";
 
 const WATER_CELL = 4; // px per pixel-art cell
-const WATER_GRID = 32; // cells per tile edge
+const WATER_GRID = 16; // cells per tile edge
 
-// Big rounded swells packed with light channels between them, the way the
-// reference tile reads. Every blob sits fully inside the tile so the channel
-// running around the border lines up when the pattern repeats.
-type Blob = { x: number; y: number; w: number; h: number; c: string };
-const WATER_BLOBS: Blob[] = [
-  // Rows are deliberately offset and unevenly sized so the channels between
-  // them wander instead of forming an obvious chequerboard.
-  { x: 1, y: 1, w: 11, h: 8, c: WATER_BLOB },
-  { x: 14, y: 0, w: 8, h: 6, c: WATER_BLOB_ALT },
-  { x: 24, y: 2, w: 7, h: 9, c: WATER_BLOB },
-  { x: 14, y: 8, w: 8, h: 4, c: WATER_BLOB },
-  { x: 0, y: 11, w: 8, h: 10, c: WATER_BLOB_ALT },
-  { x: 10, y: 14, w: 12, h: 7, c: WATER_BLOB },
-  { x: 24, y: 13, w: 8, h: 6, c: WATER_BLOB_ALT },
-  { x: 3, y: 23, w: 10, h: 8, c: WATER_BLOB },
-  { x: 15, y: 23, w: 8, h: 8, c: WATER_BLOB_ALT },
-  { x: 25, y: 21, w: 7, h: 10, c: WATER_BLOB },
+// Little two-row wave crest:  .XX.
+//                             X..X
+// Kept fully inside the tile so the repeat stays seamless.
+const WAVE_CRESTS: [number, number][] = [
+  [1, 2], [8, 1], [5, 5], [11, 4], [2, 9], [9, 8], [6, 12], [12, 11],
 ];
-// Pale specks sitting in the channels, like the highlights in the reference.
-const WATER_FOAM_DOTS: [number, number][] = [
-  [12, 9], [22, 12], [8, 12], [9, 21], [23, 20], [31, 12],
-  [13, 31], [23, 31], [1, 22], [12, 6], [22, 6], [30, 19],
+// Faint darker streaks that give the surface some depth.
+const WATER_STREAKS: [number, number, number][] = [
+  [3, 4, 4], [10, 6, 3], [0, 13, 5], [13, 2, 2], [6, 10, 3],
 ];
-
-// A pixel "blob": full body with the corner cells shaved off.
-function blobRects(b: Blob, key: number) {
-  const r = (x: number, y: number, w: number, h: number, i: string) => (
-    <rect key={`${key}-${i}`} x={x * WATER_CELL} y={y * WATER_CELL} width={w * WATER_CELL} height={h * WATER_CELL} fill={b.c} />
-  );
-  return [
-    r(b.x + 1, b.y, b.w - 2, 1, "t"),
-    r(b.x, b.y + 1, b.w, b.h - 2, "m"),
-    r(b.x + 1, b.y + b.h - 1, b.w - 2, 1, "b"),
-  ];
-}
+// Rare bright sparkles.
+const WATER_SPARKS: [number, number][] = [
+  [4, 1], [14, 9], [8, 14],
+];
 
 /**
  * The sea is drawn as a repeating pattern that carries the board's own pan and
@@ -369,20 +348,30 @@ function blobRects(b: Blob, key: number) {
  */
 function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: number; y: number }; centerX: number; centerY: number }) {
   const size = WATER_GRID * WATER_CELL;
+  const c = WATER_CELL;
   const transform = `translate(${view.x + centerX}, ${view.y + centerY}) scale(${view.scale / 48})`;
   return (
     <defs>
       <pattern id="water" width={size} height={size} patternUnits="userSpaceOnUse" patternTransform={transform}>
-        <rect width={size} height={size} fill={WATER_CHANNEL} />
-        {WATER_BLOBS.map((b, i) => blobRects(b, i))}
-        {WATER_FOAM_DOTS.map(([x, y], i) => (
-          <rect key={`f${i}`} x={x * WATER_CELL} y={y * WATER_CELL} width={WATER_CELL} height={WATER_CELL} fill={WATER_FOAM} />
+        <rect width={size} height={size} fill={WATER_BASE} />
+        {WATER_STREAKS.map(([x, y, w], i) => (
+          <rect key={`s${i}`} x={x * c} y={y * c} width={w * c} height={c} fill={WATER_DEEP} />
+        ))}
+        {WAVE_CRESTS.map(([x, y], i) => (
+          <g key={`w${i}`} fill={WATER_CREST}>
+            <rect x={(x + 1) * c} y={y * c} width={2 * c} height={c} />
+            <rect x={x * c} y={(y + 1) * c} width={c} height={c} />
+            <rect x={(x + 3) * c} y={(y + 1) * c} width={c} height={c} />
+          </g>
+        ))}
+        {WATER_SPARKS.map(([x, y], i) => (
+          <rect key={`p${i}`} x={x * c} y={y * c} width={c} height={c} fill={WATER_FOAM} />
         ))}
       </pattern>
       {/* Darkens the edges so the island stays the focus. */}
       <radialGradient id="waterVignette" cx="50%" cy="42%" r="75%">
         <stop offset="0%" stopColor="#0d1b1e" stopOpacity="0" />
-        <stop offset="100%" stopColor="#0d1b1e" stopOpacity="0.55" />
+        <stop offset="100%" stopColor="#0d1b1e" stopOpacity="0.5" />
       </radialGradient>
     </defs>
   );

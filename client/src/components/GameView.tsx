@@ -199,7 +199,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         <div className="turn-banner">
           {state.phase === "setup" && (
             <span>
-              Aufbauphase — {currentPlayer?.name} platziert {state.setupStepAwaitingRoad ? "eine Straße" : "eine Siedlung"}
+              Aufbau {state.setupRound}/2{state.setupRound === 2 ? " (rückwärts)" : ""} — {currentPlayer?.name} platziert{" "}
+              {state.setupStepAwaitingRoad ? "eine Straße" : "eine Siedlung"}
             </span>
           )}
           {state.phase === "turnOrderRoll" && <span>Würfeln um die Startreihenfolge</span>}
@@ -252,6 +253,12 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             </div>
           ))}
         </div>
+
+        {state.phase === "setup" && (
+          <p className="hint setup-note">
+            Schlangenreihenfolge: Runde 2 läuft rückwärts — wer zuletzt gelegt hat, ist direkt nochmal dran.
+          </p>
+        )}
 
         {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && !confirmingBuyCard && (
           <div className="build-bar">

@@ -238,7 +238,10 @@ body {
   padding: 8px 16px;
   border-radius: 999px;
   font-size: 0.9rem;
-  white-space: nowrap;
+  text-align: center;
+  /* Keep clear of the room code on the left and the burger menu on the right
+     instead of running underneath them. */
+  max-width: calc(100% - 116px);
 }
 
 .room-code-corner {
@@ -1244,4 +1247,13 @@ body {
 /* The buttons themselves must never shrink or scroll away. */
 .dock .bottom-actions {
   flex: 0 0 auto;
+}
+
+.setup-note {
+  font-size: 0.75rem;
+  margin: 0;
+  padding: 6px 8px;
+  background: #142c30;
+  border-radius: 8px;
+  border-left: 3px solid #f4a261;
 }

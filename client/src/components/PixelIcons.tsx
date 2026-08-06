@@ -122,6 +122,154 @@ const RECTS: Record<ResourceType, ReturnType<typeof spriteRects>> = {
   sheep: spriteRects(SPRITES.sheep),
 };
 
+/** The three figures that can sit on a tile, in the same 10x10 style. */
+export type MarkerKind = "robber" | "boost" | "bribery";
+
+const MARKER_SPRITES: Record<MarkerKind, Sprite> = {
+  // Hooded thief with a bright pair of eyes.
+  robber: {
+    palette: { O: "#0b0f14", h: "#2b3a4a", H: "#46586b", e: "#f1faee" },
+    rows: [
+      "...OOOO...",
+      "..OhHHhO..",
+      ".OhHHHHhO.",
+      ".OhhhhhhO.",
+      ".OheOOehO.",
+      ".OhhhhhhO.",
+      "OhhhhhhhhO",
+      "OhHhhhhHhO",
+      "OhhhhhhhhO",
+      ".OOOOOOOO.",
+    ],
+  },
+  // Four-pointed sparkle for the boost figure.
+  boost: {
+    palette: { O: "#8a6d1f", Y: "#fff3b0", y: "#f4d35e" },
+    rows: [
+      "....OO....",
+      "...OyyO...",
+      "..OyYYyO..",
+      ".OyYYYYyO.",
+      "OyYYYYYYyO",
+      "OyYYYYYYyO",
+      ".OyYYYYyO.",
+      "..OyYYyO..",
+      "...OyyO...",
+      "....OO....",
+    ],
+  },
+  // Money bag for the bribed tile.
+  bribery: {
+    palette: { O: "#4a2f10", b: "#d9a441", B: "#f2d478", t: "#8a5a2b" },
+    rows: [
+      "....OO....",
+      "...OttO...",
+      "..OtttO...",
+      ".ObbbbbbO.",
+      "ObbbBBbbbO",
+      "ObbBBBBbbO",
+      "ObbbBBbbbO",
+      ".ObbbbbbO.",
+      "..OOOOOO..",
+      "..........",
+    ],
+  },
+};
+
+const MARKER_RECTS: Record<MarkerKind, ReturnType<typeof spriteRects>> = {
+  robber: spriteRects(MARKER_SPRITES.robber),
+  boost: spriteRects(MARKER_SPRITES.boost),
+  bribery: spriteRects(MARKER_SPRITES.bribery),
+};
+
+export function MarkerSpriteAt({ kind, x, y, size }: { kind: MarkerKind; x: number; y: number; size: number }) {
+  return (
+    <g transform={`translate(${x - size / 2}, ${y - size / 2}) scale(${size / 10})`} shapeRendering="crispEdges">
+      {MARKER_RECTS[kind].map((r, i) => (
+        <rect key={i} x={r.x} y={r.y} width={r.w} height={1} fill={r.fill} />
+      ))}
+    </g>
+  );
+}
+
+// --- Number chips -----------------------------------------------------------
+// A 3x5 pixel digit font, the smallest size where every digit still reads.
+const DIGITS: Record<string, string[]> = {
+  "0": ["111", "101", "101", "101", "111"],
+  "1": ["010", "110", "010", "010", "111"],
+  "2": ["111", "001", "111", "100", "111"],
+  "3": ["111", "001", "111", "001", "111"],
+  "4": ["101", "101", "111", "001", "001"],
+  "5": ["111", "100", "111", "001", "111"],
+  "6": ["111", "100", "111", "101", "111"],
+  "7": ["111", "001", "010", "010", "010"],
+  "8": ["111", "101", "111", "101", "111"],
+  "9": ["111", "101", "111", "001", "111"],
+};
+
+const CHIP_GRID = 16;
+
+/** Row spans of a pixel circle — the stepped edge is what sells the 8-bit look. */
+function circleSpans(grid: number, radius: number): [number, number][] {
+  const c = grid / 2;
+  const spans: [number, number][] = [];
+  for (let y = 0; y < grid; y++) {
+    const dy = y + 0.5 - c;
+    const half = Math.sqrt(Math.max(0, radius * radius - dy * dy));
+    const from = Math.round(c - half);
+    const to = Math.round(c + half);
+    spans.push([from, Math.max(from, to)]);
+  }
+  return spans;
+}
+
+const CHIP_OUTER = circleSpans(CHIP_GRID, 8);
+const CHIP_INNER = circleSpans(CHIP_GRID, 6.6);
+
+/**
+ * A pixel-art number token: stepped circle, dark rim, the number in a 3x5
+ * font and the classic pip row underneath (more pips = more likely). 6 and 8
+ * stay red, exactly like on the cardboard chips.
+ */
+export function NumberChipAt({ value, x, y, size }: { value: number; x: number; y: number; size: number }) {
+  const hot = value === 6 || value === 8;
+  const ink = hot ? "#c1121f" : "#1b263b";
+  const digits = String(value).split("");
+  const textW = digits.length * 3 + (digits.length - 1); // 1px gap between digits
+  const textX = Math.round((CHIP_GRID - textW) / 2);
+  const textY = 4;
+  const pips = 6 - Math.abs(7 - value);
+  const pipY = 10;
+  const pipX = Math.round((CHIP_GRID - (pips * 2 - 1)) / 2);
+
+  return (
+    <g transform={`translate(${x - size / 2}, ${y - size / 2}) scale(${size / CHIP_GRID})`} shapeRendering="crispEdges">
+      {CHIP_OUTER.map(([from, to], row) =>
+        to > from ? <rect key={`o${row}`} x={from} y={row} width={to - from} height={1} fill="#2b2118" /> : null,
+      )}
+      {CHIP_INNER.map(([from, to], row) =>
+        to > from ? <rect key={`i${row}`} x={from} y={row} width={to - from} height={1} fill="#f4ecd8" /> : null,
+      )}
+      {/* A one-pixel shade along the lower edge gives the token some relief. */}
+      {CHIP_INNER.slice(11).map(([from, to], i) =>
+        to > from ? <rect key={`s${i}`} x={from} y={11 + i} width={to - from} height={1} fill="#dccdae" /> : null,
+      )}
+      {digits.flatMap((digit, di) =>
+        DIGITS[digit].flatMap((row, ry) =>
+          row.split("").map((cell, rx) =>
+            cell === "1" ? (
+              <rect key={`d${di}-${ry}-${rx}`} x={textX + di * 4 + rx} y={textY + ry} width={1} height={1} fill={ink} />
+            ) : null,
+          ),
+        ),
+      )}
+      {Array.from({ length: pips }, (_, i) => (
+        <rect key={`p${i}`} x={pipX + i * 2} y={pipY} width={1} height={1} fill={ink} />
+      ))}
+    </g>
+  );
+}
+
 /**
  * The same sprite, but as a plain <g> for use inside an existing SVG (the game
  * board), centred on (x, y) so it can be dropped onto a hex tile.

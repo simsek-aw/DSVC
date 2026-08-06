@@ -15,7 +15,7 @@ import {
   hexCorners,
   vertexKey,
 } from "@canos/shared";
-import { ResourceSpriteAt } from "./PixelIcons";
+import { MarkerKind, MarkerSpriteAt, NumberChipAt, ResourceSpriteAt } from "./PixelIcons";
 
 export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout";
 
@@ -448,7 +448,7 @@ interface MarkerTone {
   border: string;
 }
 
-const MARKER_TONES: Record<"robber" | "boost" | "bribery", MarkerTone> = {
+const MARKER_TONES: Record<MarkerKind, MarkerTone> = {
   robber: { bg: "#1b263b", border: "#e63946" },
   boost: { bg: "#14453f", border: "#f4d35e" },
   bribery: { bg: "#3f2a1d", border: "#f4a261" },
@@ -464,11 +464,10 @@ function MarkerLayer({ tiles, scale, briberyCoord }: { tiles: Tile[]; scale: num
   return (
     <g pointerEvents="none">
       {tiles.map((tile) => {
-        const marks: { key: keyof typeof MARKER_TONES; glyph: string; title: string }[] = [];
-        if (tile.revealed && tile.hasClassicRobber) marks.push({ key: "robber", glyph: "🥷", title: "Klassischer Räuber" });
-        if (tile.revealed && tile.hasBoostToken) marks.push({ key: "boost", glyph: "✨", title: "Boost-Figur" });
-        if (briberyCoord && axialKey(briberyCoord) === axialKey(tile.coord))
-          marks.push({ key: "bribery", glyph: "💰", title: "Bestochen" });
+        const marks: { key: MarkerKind; title: string }[] = [];
+        if (tile.revealed && tile.hasClassicRobber) marks.push({ key: "robber", title: "Klassischer Räuber" });
+        if (tile.revealed && tile.hasBoostToken) marks.push({ key: "boost", title: "Boost-Figur" });
+        if (briberyCoord && axialKey(briberyCoord) === axialKey(tile.coord)) marks.push({ key: "bribery", title: "Bestochen" });
         if (marks.length === 0) return null;
 
         const center = axialToPixel(tile.coord, scale);
@@ -499,9 +498,7 @@ function MarkerLayer({ tiles, scale, briberyCoord }: { tiles: Tile[]; scale: num
                 stroke={tone.border}
                 strokeWidth={1.5}
               />
-              <text x={cx} y={bottom - h / 2} textAnchor="middle" dominantBaseline="central" fontSize={h * 0.62}>
-                {mark.glyph}
-              </text>
+              <MarkerSpriteAt kind={mark.key} x={cx} y={bottom - h / 2} size={h * 0.72} />
             </g>
           );
         });
@@ -662,12 +659,7 @@ function TilePiece({
         />
       )}
       {tile.revealed && tile.numberRevealed && tile.numberToken !== null && (
-        <>
-          <circle cx={center.x} cy={center.y} r={size * 0.28} fill="#f1faee" stroke="#111" strokeWidth={1} />
-          <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="middle" className="tile-number">
-            {tile.numberToken}
-          </text>
-        </>
+        <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
       )}
       {tile.revealed && tile.port && (
         <text x={center.x} y={center.y + size * 0.6} textAnchor="middle" className="port-glyph">

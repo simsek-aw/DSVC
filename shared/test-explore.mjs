@@ -1,7 +1,7 @@
 // Engine tests for the two exploration tweaks: scouting and buried finds.
 import {
   createLobby, addPlayer, startGame, applyAction, viewFor, handSize,
-  TILE_SIZE, tileVertices, axialKey, axialNeighbors,
+  TILE_SIZE, tileVertices, axialKey, axialNeighbors, buildBoardGraph, tilesTouchingVertex,
 } from "./dist/index.js";
 
 function assert(cond, msg) {
@@ -36,8 +36,12 @@ const anchor = s.tiles.find((t) => t.terrain !== "desert");
 const anchorVerts = tileVertices(anchor.coord, TILE_SIZE);
 s = { ...s, phase: "mainGame", currentPlayerIndex: s.turnOrder.indexOf("A"),
       buildings: [{ vertex: anchorVerts[0], type: "settlement", ownerId: "A" }] };
-// Anna's settlement only touches tiles around that vertex; find a hidden neighbour of one of them.
-const myTiles = new Set([axialKey(anchor.coord)]);
+// Anna's settlement touches every tile around that vertex — all of them count
+// as "hers" for the adjacency rule, so the set has to come from the board graph
+// rather than from the anchor tile alone (otherwise the far-tile check below
+// picks a coordinate that is in fact adjacent, and fails at random).
+const graph = buildBoardGraph(s.tiles, TILE_SIZE);
+const myTiles = new Set(tilesTouchingVertex(graph, anchorVerts[0]).map(axialKey));
 const targetCoord = s.tiles
   .map((t) => t.coord)
   .find((c) => !myTiles.has(axialKey(c)) && axialNeighbors(c).some((n) => myTiles.has(axialKey(n))));

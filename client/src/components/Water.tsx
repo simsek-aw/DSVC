@@ -35,13 +35,12 @@ const PERIOD = 8; // diamond size; divides the 32-grid so the tile stays seamles
 function cellFill(x: number, y: number): string {
   const d1 = (x + y) % PERIOD; // along one diagonal
   const d2 = (((x - y) % PERIOD) + PERIOD) % PERIOD; // along the other
-  const onNet = d1 <= 1 || d2 <= 1; // 2px-thick diamond outlines
+  const onNet = d1 === 0 || d2 === 0; // thin 1px diamond outlines
 
-  if (onNet) {
-    // Keep most of the net white, but drop ~30% of it to little gaps so the
-    // lines look hand-drawn and drifting rather than perfectly ruled.
-    return hash(x, y) > 0.3 ? WATER_FOAM : WATER_DEEP;
-  }
+  // Only sprinkle white along the net — most of it stays water, so the diamonds
+  // read as a faint dotted outline rather than solid white lines.
+  if (onNet && hash(x, y) > 0.6) return WATER_FOAM;
+
   const near1 = Math.min(d1, PERIOD - d1);
   const near2 = Math.min(d2, PERIOD - d2);
   if (near1 >= 3 && near2 >= 3) return WATER_LIGHT; // bright diamond interiors

@@ -12,7 +12,7 @@ export const WATER_DEEP = "#14b0c9"; // gently darker patches
 export const WATER_FOAM = "#ffffff"; // white sparkle crests
 
 export const WATER_CELL = 5; // px per pixel-art cell — chunky, like the reference
-export const WATER_GRID = 32; // cells per tile edge — bigger tile hides the repeat
+export const WATER_GRID = 64; // cells per tile edge — big tile, so the repeat barely shows
 
 type Cell = { x: number; y: number; fill: string };
 

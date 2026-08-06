@@ -226,8 +226,14 @@ function collectTreasure(state: GameState, tile: Tile, finderId: string): GameSt
  */
 export function viewFor(state: GameState, playerId: string): GameState {
   if (state.demoMode) return state; // one device plays every seat
+  // Only the victim gets to see what is actually in the fanned-out hand; for
+  // everyone else — the thief above all — it is just a number of face-down
+  // cards, so the answer never travels to a client that must not have it.
+  const steal = state.pendingSteal;
+  const pendingSteal = steal && steal.victimId !== playerId ? { ...steal, hand: [] } : steal;
   return {
     ...state,
+    pendingSteal,
     tiles: state.tiles.map((t) => {
       const scouted = t.scoutedBy.includes(playerId);
       if (t.revealed) return { ...t, scoutedBy: scouted ? [playerId] : [] };
@@ -309,6 +315,7 @@ function beginSteal(state: GameState, tile: Tile, thiefId: string): GameState {
       candidateIds,
       victimId,
       hand: victim ? buildShuffledHand(victim) : [],
+      handCount: victim ? handSize(victim) : 0,
     },
   };
 }
@@ -619,7 +626,10 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       if (!steal.candidateIds.includes(action.victimId)) throw new GameError("Dieser Spieler ist kein gültiges Ziel.");
       const victim = state.players.find((p) => p.id === action.victimId);
       if (!victim) throw new GameError("Spieler nicht gefunden.");
-      return { ...state, pendingSteal: { ...steal, victimId: action.victimId, hand: buildShuffledHand(victim) } };
+      return {
+        ...state,
+        pendingSteal: { ...steal, victimId: action.victimId, hand: buildShuffledHand(victim), handCount: handSize(victim) },
+      };
     }
 
     case "shuffleStealHand": {
@@ -627,6 +637,22 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
       if (!steal || !steal.victimId) throw new GameError("Gerade wird nichts von dir gestohlen.");
       if (steal.victimId !== playerId) throw new GameError("Das ist nicht deine Hand.");
       return { ...state, pendingSteal: { ...steal, hand: shuffle(steal.hand) } };
+    }
+
+    // The victim may drag their own cards around before the thief commits —
+    // they know what they hold, the thief only ever sees the backs.
+    case "reorderStealHand": {
+      const steal = state.pendingSteal;
+      if (!steal || !steal.victimId) throw new GameError("Gerade wird nichts von dir gestohlen.");
+      if (steal.victimId !== playerId) throw new GameError("Das ist nicht deine Hand.");
+      const { from, to } = action;
+      if (from < 0 || from >= steal.hand.length || to < 0 || to >= steal.hand.length) {
+        throw new GameError("Diese Karte gibt es nicht.");
+      }
+      const hand = [...steal.hand];
+      const [card] = hand.splice(from, 1);
+      hand.splice(to, 0, card);
+      return { ...state, pendingSteal: { ...steal, hand } };
     }
 
     case "stealCard": {

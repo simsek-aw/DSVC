@@ -122,6 +122,20 @@ const RECTS: Record<ResourceType, ReturnType<typeof spriteRects>> = {
   sheep: spriteRects(SPRITES.sheep),
 };
 
+/**
+ * The same sprite, but as a plain <g> for use inside an existing SVG (the game
+ * board), centred on (x, y) so it can be dropped onto a hex tile.
+ */
+export function ResourceSpriteAt({ resource, x, y, size }: { resource: ResourceType; x: number; y: number; size: number }) {
+  return (
+    <g transform={`translate(${x - size / 2}, ${y - size / 2}) scale(${size / 10})`} shapeRendering="crispEdges">
+      {RECTS[resource].map((r, i) => (
+        <rect key={i} x={r.x} y={r.y} width={r.w} height={1} fill={r.fill} />
+      ))}
+    </g>
+  );
+}
+
 export function ResourceSprite({ resource, size = 24 }: { resource: ResourceType; size?: number }) {
   return (
     <svg

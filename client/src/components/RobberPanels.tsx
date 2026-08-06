@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { GameState, ResourceType, RESOURCE_TYPES } from "@canos/shared";
 import { ResourceSprite } from "./PixelIcons";
 
@@ -31,8 +31,8 @@ export function DiscardPanel({ state, myPlayerId, sendAction }: Props) {
             return (
               <div key={r} className="discard-cell">
                 <span className="resource-icon">
-                    <ResourceSprite resource={r} size={24} />
-                  </span>
+                  <ResourceSprite resource={r} size={24} />
+                </span>
                 <span className="discard-count">
                   {have - chosen}
                   {chosen > 0 && <span className="discard-chosen"> −{chosen}</span>}
@@ -116,32 +116,105 @@ export function StealPanel({ state, myPlayerId, sendAction }: Props) {
     );
   }
 
+  if (amVictim) return <VictimHand steal={steal} thiefName={thief?.name ?? ""} sendAction={sendAction} />;
+
+  // The thief only ever sees backs — the contents never even reach this client.
+  const count = steal.handCount;
   return (
     <div className="robber-overlay">
       <div className="robber-box">
-        <h3>{amThief ? `Zieh eine Karte von ${victim?.name}` : `${thief?.name} greift nach deinen Karten!`}</h3>
+        <h3>Zieh eine Karte von {victim?.name}</h3>
         <div className="steal-hand">
-          {steal.hand.map((_, i) => (
+          {Array.from({ length: count }, (_, i) => (
             <button
               key={i}
               className="steal-card"
-              disabled={!amThief}
-              style={{ transform: `rotate(${(i - (steal.hand.length - 1) / 2) * 7}deg)` }}
-              onClick={() => amThief && sendAction({ type: "stealCard", index: i })}
+              style={{ transform: `rotate(${(i - (count - 1) / 2) * 7}deg)` }}
+              onClick={() => sendAction({ type: "stealCard", index: i })}
             >
               ?
             </button>
           ))}
         </div>
-        {amVictim && (
-          <>
-            <button className="primary-button" onClick={() => sendAction({ type: "shuffleStealHand" })}>
-              🔀 Schnell mischen!
-            </button>
-            <p className="hint">Du kannst mischen, solange {thief?.name} noch nicht gezogen hat.</p>
-          </>
-        )}
-        {amThief && <p className="hint">Verdeckt — such dir eine aus. Achtung: dein Opfer mischt vielleicht noch.</p>}
+        <p className="hint">Verdeckt — such dir eine aus. Achtung: dein Opfer sortiert vielleicht noch um.</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The victim's side of the steal. They see their own cards face up (they know
+ * what they hold anyway) and can drag them into a new order or shuffle, right
+ * up until the thief commits to a position.
+ */
+function VictimHand({
+  steal,
+  thiefName,
+  sendAction,
+}: {
+  steal: NonNullable<GameState["pendingSteal"]>;
+  thiefName: string;
+  sendAction: (action: any) => void;
+}) {
+  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // While dragging, show the order the drop would produce.
+  const order = steal.hand.map((card, i) => ({ card, i }));
+  if (drag && drag.from !== drag.over) {
+    const [moved] = order.splice(drag.from, 1);
+    order.splice(drag.over, 0, moved);
+  }
+
+  const indexAt = (clientX: number): number | null => {
+    for (let i = 0; i < cardRefs.current.length; i++) {
+      const el = cardRefs.current[i];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (clientX >= r.left && clientX <= r.right) return i;
+    }
+    return null;
+  };
+
+  return (
+    <div className="robber-overlay">
+      <div className="robber-box">
+        <h3>{thiefName} greift nach deinen Karten!</h3>
+        <div className="steal-hand victim">
+          {order.map(({ card, i }, slot) => (
+            <div
+              key={i}
+              ref={(el) => (cardRefs.current[slot] = el)}
+              className={`steal-card face-up ${drag?.over === slot ? "dragging" : ""}`}
+              style={{ transform: `rotate(${(slot - (order.length - 1) / 2) * 7}deg)` }}
+              onPointerDown={(e) => {
+                (e.target as Element).setPointerCapture?.(e.pointerId);
+                setDrag({ from: slot, over: slot });
+              }}
+              onPointerMove={(e) => {
+                if (!drag) return;
+                const over = indexAt(e.clientX);
+                if (over !== null && over !== drag.over) setDrag({ ...drag, over });
+              }}
+              onPointerUp={() => {
+                if (drag && drag.from !== drag.over) {
+                  sendAction({ type: "reorderStealHand", from: drag.from, to: drag.over });
+                }
+                setDrag(null);
+              }}
+              onPointerCancel={() => setDrag(null)}
+            >
+              <ResourceSprite resource={card} size={34} />
+            </div>
+          ))}
+        </div>
+        <button className="primary-button" onClick={() => sendAction({ type: "shuffleStealHand" })}>
+          🔀 Schnell mischen!
+        </button>
+        <p className="hint">
+          Nur du siehst deine Karten — {thiefName} sieht die Rückseiten. Karten verschieben oder mischen, solange noch nicht gezogen
+          wurde.
+        </p>
       </div>
     </div>
   );

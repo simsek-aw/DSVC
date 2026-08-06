@@ -1,7 +1,7 @@
 // Direct engine test for the robber rules: discard-on-7 and the steal flow.
 import {
   createLobby, addPlayer, startGame, applyAction, handSize, TILE_SIZE,
-  buildBoardGraph, tilesTouchingVertex, vertexKey, tileVertices,
+  buildBoardGraph, tilesTouchingVertex, vertexKey, tileVertices, viewFor,
 } from "./dist/index.js";
 
 function assert(cond, msg) {
@@ -144,3 +144,32 @@ s3 = applyAction(s3, "A", { type: "moveClassicRobber", coord: tile.coord });
 assert(s3.pendingSteal === null, "no steal when only the thief is adjacent");
 
 console.log("\nALL ROBBER TESTS PASSED");
+
+console.log("\n--- Opfer sortiert seine Hand um ---");
+{
+  // Reuse the last state that had an open steal, if the script kept one around.
+  let t = createLobby("RB-REORDER");
+  t = addPlayer(t, "A", "Anna");
+  t = addPlayer(t, "B", "Ben");
+  t = startGame(t);
+  t = applyAction(t, "A", { type: "rollTurnOrder" });
+  t = applyAction(t, "B", { type: "rollTurnOrder" });
+  t = {
+    ...t,
+    pendingSteal: { thiefId: "B", candidateIds: ["A"], victimId: "A", hand: ["wood", "ore", "sheep"], handCount: 3 },
+  };
+  const moved = applyAction(t, "A", { type: "reorderStealHand", from: 0, to: 2 });
+  assert(moved.pendingSteal.hand.join(",") === "ore,sheep,wood", "Karte wandert ans Ende");
+  try {
+    applyAction(t, "B", { type: "reorderStealHand", from: 0, to: 1 });
+    console.error("FAIL: Dieb durfte sortieren"); process.exit(1);
+  } catch (e) { console.log("  ok: Dieb darf nicht sortieren —", e.message); }
+
+  const thiefView = viewFor(t, "B");
+  assert(thiefView.pendingSteal.hand.length === 0, "Dieb bekommt den Handinhalt gar nicht erst");
+  assert(thiefView.pendingSteal.handCount === 3, "Dieb sieht nur die Anzahl");
+  const victimView = viewFor(t, "A");
+  assert(victimView.pendingSteal.hand.length === 3, "Opfer sieht seine eigenen Karten");
+}
+
+console.log("\nALLE REORDER-TESTS BESTANDEN");

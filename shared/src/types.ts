@@ -112,7 +112,11 @@ export interface PendingSteal {
   thiefId: string;
   candidateIds: string[]; // players adjacent to the robber who still hold cards
   victimId: string | null; // set once the thief has picked whom to rob
+  // The victim's cards in their current order. Only the victim ever receives
+  // the actual contents — everyone else gets an empty list plus handCount, so
+  // the thief cannot read the answer out of the network payload.
   hand: ResourceType[];
+  handCount: number;
 }
 
 export interface Negotiation {
@@ -202,6 +206,7 @@ export type ClientAction =
   | { type: "discardResources"; resources: Partial<Record<ResourceType, number>> }
   | { type: "chooseStealVictim"; victimId: string }
   | { type: "shuffleStealHand" }
+  | { type: "reorderStealHand"; from: number; to: number }
   | { type: "stealCard"; index: number }
   | { type: "startNegotiation"; withPlayerId: string }
   | { type: "respondNegotiation"; accept: boolean }

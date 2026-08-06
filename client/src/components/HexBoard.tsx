@@ -4,6 +4,7 @@ import {
   BUILD_COSTS,
   EdgeId,
   GameState,
+  ResourceType,
   TILE_SIZE,
   Tile,
   VertexId,
@@ -14,6 +15,7 @@ import {
   hexCorners,
   vertexKey,
 } from "@canos/shared";
+import { ResourceSpriteAt } from "./PixelIcons";
 
 export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout";
 
@@ -164,14 +166,12 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
         <CoastLayer tiles={state.tiles} scale={view.scale} />
         {state.tiles.map((tile) => {
           const center = px(tile.coord);
-          const isBribed = state.briberyTileCoord && axialKey(state.briberyTileCoord) === axialKey(tile.coord);
           return (
             <TilePiece
               key={axialKey(tile.coord)}
               tile={tile}
               center={center}
               size={view.scale}
-              isBribed={!!isBribed}
               scouted={tile.scoutedBy.includes(myPlayerId)}
               onClickTile={() => handleTileClick(tile)}
             />
@@ -309,6 +309,8 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
             />
           );
         })}
+
+        <MarkerLayer tiles={state.tiles} scale={view.scale} briberyCoord={state.briberyTileCoord} />
       </g>
     </svg>
   );
@@ -361,7 +363,7 @@ function rippleRects(yTop: number, phase: number, bright: boolean, key: number, 
 // Pixel textures for the land, in the same handheld-RPG register as the sea:
 // a flat base colour with a handful of darker and lighter marks that read as
 // canopy, brickwork, rock facets, crop rows and tufts of grass.
-const TERRAIN_CELL = 4;
+const TERRAIN_CELL = 3;
 const TERRAIN_GRID = 8;
 
 type Mark = [number, number, number, number, string]; // x, y, w, h, colour
@@ -440,6 +442,73 @@ const TERRAIN_TEXTURES: Record<string, { base: string; marks: Mark[] }> = {
     ],
   },
 };
+
+interface MarkerTone {
+  bg: string;
+  border: string;
+}
+
+const MARKER_TONES: Record<"robber" | "boost" | "bribery", MarkerTone> = {
+  robber: { bg: "#1b263b", border: "#e63946" },
+  boost: { bg: "#14453f", border: "#f4d35e" },
+  bribery: { bg: "#3f2a1d", border: "#f4a261" },
+};
+
+/**
+ * Robber, boost figure and bribery marker sit in little speech bubbles that
+ * hover over the board and point down at their tile, instead of a bare emoji
+ * floating on the terrain. Drawn as one layer after all tiles so a bubble is
+ * never clipped by the neighbouring hex it overlaps.
+ */
+function MarkerLayer({ tiles, scale, briberyCoord }: { tiles: Tile[]; scale: number; briberyCoord: AxialCoord | null }) {
+  return (
+    <g pointerEvents="none">
+      {tiles.map((tile) => {
+        const marks: { key: keyof typeof MARKER_TONES; glyph: string; title: string }[] = [];
+        if (tile.revealed && tile.hasClassicRobber) marks.push({ key: "robber", glyph: "🥷", title: "Klassischer Räuber" });
+        if (tile.revealed && tile.hasBoostToken) marks.push({ key: "boost", glyph: "✨", title: "Boost-Figur" });
+        if (briberyCoord && axialKey(briberyCoord) === axialKey(tile.coord))
+          marks.push({ key: "bribery", glyph: "💰", title: "Bestochen" });
+        if (marks.length === 0) return null;
+
+        const center = axialToPixel(tile.coord, scale);
+        const w = scale * 0.56;
+        const h = scale * 0.46;
+        const bottom = center.y - scale * 0.44; // bubble sits just above the tile
+        const tipY = center.y - scale * 0.2; // and points into it
+        return marks.map((mark, i) => {
+          const cx = center.x + (i - (marks.length - 1) / 2) * (w + scale * 0.08);
+          const tone = MARKER_TONES[mark.key];
+          return (
+            <g key={`${axialKey(tile.coord)}-${mark.key}`} className="map-bubble">
+              <title>{mark.title}</title>
+              <path
+                d={`M ${cx - w * 0.18} ${bottom - 1} L ${cx + w * 0.18} ${bottom - 1} L ${cx} ${tipY} Z`}
+                fill={tone.bg}
+                stroke={tone.border}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+              />
+              <rect
+                x={cx - w / 2}
+                y={bottom - h}
+                width={w}
+                height={h}
+                rx={h * 0.34}
+                fill={tone.bg}
+                stroke={tone.border}
+                strokeWidth={1.5}
+              />
+              <text x={cx} y={bottom - h / 2} textAnchor="middle" dominantBaseline="central" fontSize={h * 0.62}>
+                {mark.glyph}
+              </text>
+            </g>
+          );
+        });
+      })}
+    </g>
+  );
+}
 
 /**
  * The shoreline. Three concentric rings of the same hex silhouette are drawn
@@ -536,14 +605,12 @@ function TilePiece({
   tile,
   center,
   size,
-  isBribed,
   scouted,
   onClickTile,
 }: {
   tile: Tile;
   center: { x: number; y: number };
   size: number;
-  isBribed: boolean;
   scouted: boolean;
   onClickTile: () => void;
 }) {
@@ -584,6 +651,16 @@ function TilePiece({
           )}
         </>
       )}
+      {/* The tile says what it produces, in the same pixel art as the hand —
+          upper left so it never fights with the number token. */}
+      {tile.revealed && tile.terrain !== "desert" && tile.terrain !== "unknown" && (
+        <ResourceSpriteAt
+          resource={tile.terrain as ResourceType}
+          x={center.x - size * 0.46}
+          y={center.y - size * 0.3}
+          size={size * 0.38}
+        />
+      )}
       {tile.revealed && tile.numberRevealed && tile.numberToken !== null && (
         <>
           <circle cx={center.x} cy={center.y} r={size * 0.28} fill="#f1faee" stroke="#111" strokeWidth={1} />
@@ -591,24 +668,6 @@ function TilePiece({
             {tile.numberToken}
           </text>
         </>
-      )}
-      {tile.revealed && tile.hasClassicRobber && (
-        <text x={center.x} y={center.y - size * 0.5} textAnchor="middle" className="robber-glyph">
-          <title>Klassischer Räuber</title>
-          🥷
-        </text>
-      )}
-      {tile.revealed && tile.hasBoostToken && (
-        <text x={center.x} y={center.y - size * 0.5} textAnchor="middle" className="robber-glyph">
-          <title>Boost-Figur</title>
-          ✨
-        </text>
-      )}
-      {isBribed && (
-        <text x={center.x + size * 0.4} y={center.y - size * 0.5} textAnchor="middle" className="robber-glyph">
-          <title>Bestochen</title>
-          💰
-        </text>
       )}
       {tile.revealed && tile.port && (
         <text x={center.x} y={center.y + size * 0.6} textAnchor="middle" className="port-glyph">

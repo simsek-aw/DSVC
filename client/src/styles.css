@@ -1241,6 +1241,26 @@ body {
   cursor: default;
 }
 
+/* The victim's own view: cards face up so they know what they are sorting. */
+.steal-card.face-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1faee;
+  border-color: #0d1b1e;
+  /* The whole card is a drag handle, so no browser scrolling/text selection. */
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.steal-card.face-up.dragging {
+  border-color: #f4a261;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+  transform: translateY(-10px) !important;
+  cursor: grabbing;
+}
+
 /* Bottom dock: stays pinned to the lower edge of the sidebar, and anything
    opened from its buttons (cards, trade) grows upward above them. */
 .dock {

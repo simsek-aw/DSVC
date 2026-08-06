@@ -203,6 +203,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const lastRollKeyRef = useRef<string>("");
   const prevPlayerIndexRef = useRef<number | null>(null);
   const prevResourcesRef = useRef(me?.resources);
+  const prevStealRef = useRef(state.pendingSteal);
   const notifiedRef = useRef(false);
   const logSeenRef = useRef(state.log.length);
   const prodRollRef = useRef<string>("");
@@ -363,6 +364,29 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     return out;
   };
 
+  // When I rob someone on a 7, the card I drew is now revealed to me as a real
+  // resource: fly it out of the robber's tile into the matching chip so the
+  // steal reads the same way a harvest does, then let the "+1" land with it.
+  const spawnStealFlight = (resource: ResourceType): Flight[] => {
+    const api = boardApiRef.current;
+    const chip = chipRefs.current[resource]?.getBoundingClientRect();
+    if (!chip) return [];
+    const robberTile = state.tiles.find((t) => t.hasClassicRobber);
+    const from = robberTile && api ? api.getTileScreenPos(robberTile.coord) : null;
+    const x0 = from?.x ?? window.innerWidth / 2;
+    const y0 = from?.y ?? window.innerHeight / 2;
+    return [
+      {
+        id: `${Date.now()}-steal-${resource}-${Math.random()}`,
+        resource,
+        x0,
+        y0,
+        x1: chip.x + chip.width / 2,
+        y1: chip.y + chip.height / 2,
+      },
+    ];
+  };
+
   // Resource gains: a floating "+N" per resource that increased. When the gain
   // comes from dice production, a sprite first flies out of each producing tile
   // into the matching resource, and the "+N" only pops once it lands.
@@ -384,11 +408,23 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       newGains.forEach((g) => setTimeout(() => setGains((cur) => cur.filter((x) => x.id !== g.id)), 1600));
     };
 
+    // Did this gain come from robbing someone? The steal that just resolved had
+    // me as the thief and cleared with a single +1 — fly that card in.
+    const wasThief = !!prevStealRef.current && prevStealRef.current.thiefId === myPlayerId;
+    const justStole =
+      wasThief && !state.pendingSteal && newGains.length === 1 && newGains[0].amount === 1;
+
     // Is this a dice harvest? Then start the flights from the actual tiles.
     const roll = state.lastDiceRoll;
     const rollKey = roll ? `${roll.die1}-${roll.die2}-${state.currentPlayerIndex}` : "";
     const isProduction = !!roll && roll.total !== 7 && rollKey !== prodRollRef.current;
-    const spawned = isProduction ? spawnHarvestFlights(roll!.total) : state.phase === "setup" ? spawnSetupFlights() : [];
+    const spawned = justStole
+      ? spawnStealFlight(newGains[0].resource)
+      : isProduction
+      ? spawnHarvestFlights(roll!.total)
+      : state.phase === "setup"
+      ? spawnSetupFlights()
+      : [];
 
     if (spawned.length > 0) {
       prodRollRef.current = rollKey;
@@ -401,6 +437,12 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     // Non-harvest gains (trade, dev card, treasure): show the count right away.
     showGains();
   }, [me?.resources]);
+
+  // Track the steal in flight so the gain effect above can tell a robbery apart
+  // from any other +1. Runs after that effect, so it still sees the old value.
+  useEffect(() => {
+    prevStealRef.current = state.pendingSteal;
+  }, [state.pendingSteal]);
 
   const latestLogEntry = state.log[state.log.length - 1] ?? "";
 

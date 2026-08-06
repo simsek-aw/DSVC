@@ -7,28 +7,42 @@
 // board (where it pans and zooms with the map) and the lobby (still backdrop).
 
 export const WATER_BASE = "#18bdd6"; // cyan base
-export const WATER_LIGHT = "#5cdaea"; // lighter diamond centres
-export const WATER_DEEP = "#12a6bf"; // faint shading along the net
-export const WATER_FOAM = "#ffffff"; // the white lattice dashes
+export const WATER_LIGHT = "#41cfe1"; // gently lighter patches
+export const WATER_DEEP = "#14b0c9"; // gently darker patches
+export const WATER_FOAM = "#ffffff"; // white sparkle crests
 
-export const WATER_CELL = 4; // px per pixel-art cell
-export const WATER_GRID = 16; // cells per tile edge
-const PERIOD = 8; // diagonal period; divides the grid so the tile is seamless
+export const WATER_CELL = 5; // px per pixel-art cell — chunky, like the reference
+export const WATER_GRID = 32; // cells per tile edge — bigger tile hides the repeat
 
 type Cell = { x: number; y: number; fill: string };
 
-/** Colour for one cell of the tile — a diamond net of white dashes over cyan. */
+// Deterministic value in [0,1) from a cell. Because inputs are always taken
+// mod WATER_GRID, the noise repeats exactly at the tile edge, so the tile
+// stays seamless while still looking irregular rather than a mechanical grid.
+function hash(x: number, y: number): number {
+  let h = (Math.imul(x & 255, 374761393) + Math.imul(y & 255, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+
+/**
+ * Colour for one cell: a cyan base with soft blocky patches of lighter and
+ * darker water, plus white "sparkle" pixels scattered mostly along broken
+ * diagonals — the flowing-net look of the reference, without the rigid lattice.
+ */
 function cellFill(x: number, y: number): string {
-  const d1 = (x + y) % PERIOD; // distance along one diagonal
-  const d2 = (((x - y) % PERIOD) + PERIOD) % PERIOD; // and the other
-  const onNet = d1 === 0 || d2 === 0;
-  const white = (d1 === 0 && x % 2 === 0) || (d2 === 0 && y % 2 === 0);
-  if (white) return WATER_FOAM;
-  if (onNet) return WATER_DEEP; // the un-dashed parts of the lattice sit a shade darker
-  const near1 = Math.min(d1, PERIOD - d1);
-  const near2 = Math.min(d2, PERIOD - d2);
-  if (near1 >= 3 && near2 >= 3) return WATER_LIGHT; // bright diamond interiors
-  return WATER_BASE;
+  // Low-frequency patches (4x4 blocks) decide the base shade of the water.
+  const patch = hash(x >> 2, y >> 2);
+  let fill = WATER_BASE;
+  if (patch > 0.72) fill = WATER_LIGHT;
+  else if (patch < 0.16) fill = WATER_DEEP;
+
+  // Sparkles: mostly along gentle diagonals so the white reads as a few
+  // drifting crests, with only the odd stray fleck off them.
+  const onDiag = (x + y) % 6 < 2 || (((x - y) % 6) + 6) % 6 < 2;
+  const h = hash(x, y);
+  if ((onDiag && h > 0.78) || h > 0.965) fill = WATER_FOAM;
+  return fill;
 }
 
 /** Merge each row into horizontal runs so the tile is a handful of rects. */

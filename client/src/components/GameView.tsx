@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, SCOUT_COST, bestBankRatio } from "@canos/shared";
-import { HexBoard, BuildMode } from "./HexBoard";
+import { HexBoard, BuildMode, MapInfo } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
 import { ResourceSprite } from "./PixelIcons";
@@ -38,6 +38,8 @@ const CARD_LABELS: Record<DevelopmentCardType, string> = {
 
 export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [buildMode, setBuildMode] = useState<BuildMode>(null);
+  // Short explanation of whatever map element was tapped last (port, robber, …).
+  const [mapInfo, setMapInfo] = useState<MapInfo | null>(null);
   const [freeRoadEdges, setFreeRoadEdges] = useState<EdgeId[]>([]);
   const [inventionPicks, setInventionPicks] = useState<[ResourceType, ResourceType]>(["wood", "wood"]);
   const [monopolyPick, setMonopolyPick] = useState<ResourceType>("wood");
@@ -174,7 +176,19 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           sendAction={sendAction}
           freeRoadEdges={buildMode === "roadBuilding" ? freeRoadEdges : undefined}
           onSelectFreeRoadEdge={onSelectFreeRoadEdge}
+          onInspect={setMapInfo}
         />
+        {mapInfo && (
+          <div className="map-info-card" onClick={() => setMapInfo(null)}>
+            <div className="map-info-head">
+              <strong>{mapInfo.title}</strong>
+              <button className="small" onClick={() => setMapInfo(null)}>
+                ✕
+              </button>
+            </div>
+            <p>{mapInfo.text}</p>
+          </div>
+        )}
         <div className="room-code-corner" title="Raum-Code — zum Wiederbeitreten mit demselben Namen eingeben">
           {state.roomId}
         </div>

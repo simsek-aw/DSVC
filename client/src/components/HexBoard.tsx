@@ -5,6 +5,7 @@ import {
   EdgeId,
   GameState,
   ResourceType,
+  TERRAIN_NAMES_DE,
   TILE_SIZE,
   Tile,
   VertexId,
@@ -26,6 +27,13 @@ interface Props {
   sendAction: (action: any) => void;
   freeRoadEdges?: EdgeId[];
   onSelectFreeRoadEdge?: (edge: EdgeId) => void;
+  onInspect?: (info: MapInfo) => void;
+}
+
+/** Short explanation of a map element, shown when the player taps it. */
+export interface MapInfo {
+  title: string;
+  text: string;
 }
 
 const TERRAIN_COLORS: Record<string, string> = {
@@ -53,7 +61,15 @@ function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number 
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdges, onSelectFreeRoadEdge }: Props) {
+export function HexBoard({
+  state,
+  myPlayerId,
+  buildMode,
+  sendAction,
+  freeRoadEdges,
+  onSelectFreeRoadEdge,
+  onInspect,
+}: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ scale: 48, x: 0, y: 0 });
 
@@ -131,6 +147,11 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
 
   const awaitingRobberMove = state.lastDiceRoll?.total === 7 && !state.robberTileCoord;
 
+  // While a tap is supposed to place the robber or aim a card, taps must reach
+  // the tile itself — explaining things would swallow them.
+  const aiming = awaitingRobberMove || buildMode === "knight" || buildMode === "bribery" || buildMode === "scout";
+  const inspect = aiming ? undefined : onInspect;
+
   const handleTileClick = (tile: Tile) => {
     if (awaitingRobberMove) {
       sendAction({ type: "moveClassicRobber", coord: tile.coord });
@@ -174,6 +195,7 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
               size={view.scale}
               scouted={tile.scoutedBy.includes(myPlayerId)}
               onClickTile={() => handleTileClick(tile)}
+              onInspect={inspect}
             />
           );
         })}
@@ -310,7 +332,13 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
           );
         })}
 
-        <MarkerLayer tiles={state.tiles} scale={view.scale} briberyCoord={state.briberyTileCoord} />
+        <MarkerLayer
+          tiles={state.tiles}
+          scale={view.scale}
+          briberyCoord={state.briberyTileCoord}
+          briberyBeneficiary={state.players.find((p) => p.id === state.briberyBeneficiaryId)?.name ?? "den Spieler"}
+          onInspect={inspect}
+        />
       </g>
     </svg>
   );
@@ -460,9 +488,36 @@ const MARKER_TONES: Record<MarkerKind, MarkerTone> = {
  * floating on the terrain. Drawn as one layer after all tiles so a bubble is
  * never clipped by the neighbouring hex it overlaps.
  */
-function MarkerLayer({ tiles, scale, briberyCoord }: { tiles: Tile[]; scale: number; briberyCoord: AxialCoord | null }) {
+const MARKER_INFO: Record<MarkerKind, MapInfo> = {
+  robber: {
+    title: "Räuber",
+    text: "Blockiert dieses Feld komplett: es liefert nichts mehr, bis jemand eine 7 würfelt und ihn weiterzieht. Wer eine 7 würfelt, darf danach einem Anlieger eine Karte klauen.",
+  },
+  boost: {
+    title: "Boost-Figur",
+    text: "Dieses Feld liefert die doppelte Ernte — für alle, die daran bauen. Die Figur liegt seit Kartenerstellung fest und wandert nicht.",
+  },
+  bribery: {
+    title: "Bestochener Räuber",
+    text: "Die Ernte dieses Feldes geht an einen anderen Spieler, statt an die Anlieger. Der Effekt hält, bis jemand eine 7 würfelt oder selbst eine Bestechung spielt.",
+  },
+};
+
+function MarkerLayer({
+  tiles,
+  scale,
+  briberyCoord,
+  briberyBeneficiary,
+  onInspect,
+}: {
+  tiles: Tile[];
+  scale: number;
+  briberyCoord: AxialCoord | null;
+  briberyBeneficiary: string;
+  onInspect?: (info: MapInfo) => void;
+}) {
   return (
-    <g pointerEvents="none">
+    <g pointerEvents={onInspect ? "auto" : "none"}>
       {tiles.map((tile) => {
         const marks: { key: MarkerKind; title: string }[] = [];
         if (tile.revealed && tile.hasClassicRobber) marks.push({ key: "robber", title: "Klassischer Räuber" });
@@ -479,7 +534,20 @@ function MarkerLayer({ tiles, scale, briberyCoord }: { tiles: Tile[]; scale: num
           const cx = center.x + (i - (marks.length - 1) / 2) * (w + scale * 0.08);
           const tone = MARKER_TONES[mark.key];
           return (
-            <g key={`${axialKey(tile.coord)}-${mark.key}`} className="map-bubble">
+            <g
+              key={`${axialKey(tile.coord)}-${mark.key}`}
+              className={`map-bubble ${onInspect ? "inspectable" : ""}`}
+              onClick={(e) => {
+                if (!onInspect) return;
+                e.stopPropagation();
+                const info = MARKER_INFO[mark.key];
+                onInspect(
+                  mark.key === "bribery"
+                    ? { ...info, text: info.text.replace("an einen anderen Spieler", `an ${briberyBeneficiary}`) }
+                    : info,
+                );
+              }}
+            >
               <title>{mark.title}</title>
               <path
                 d={`M ${cx - w * 0.18} ${bottom - 1} L ${cx + w * 0.18} ${bottom - 1} L ${cx} ${tipY} Z`}
@@ -604,12 +672,14 @@ function TilePiece({
   size,
   scouted,
   onClickTile,
+  onInspect,
 }: {
   tile: Tile;
   center: { x: number; y: number };
   size: number;
   scouted: boolean;
   onClickTile: () => void;
+  onInspect?: (info: MapInfo) => void;
 }) {
   const points = tilePolygonPoints(center, size * 0.97);
   // A scouted tile shows its terrain only to the player who paid for the look,
@@ -632,7 +702,21 @@ function TilePiece({
         strokeDasharray={scouted && !tile.revealed ? "4 3" : undefined}
       />
       {!tile.revealed && !scouted && (
-        <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="middle" className="tile-back-glyph">
+        <text
+          x={center.x}
+          y={center.y}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className={`tile-back-glyph ${onInspect ? "inspectable" : ""}`}
+          onClick={(e) => {
+            if (!onInspect) return;
+            e.stopPropagation();
+            onInspect({
+              title: "Verdecktes Feld",
+              text: "Niemand weiß, was hier liegt. Es dreht sich um, sobald eine Siedlung eine seiner Ecken berührt — oder du schickst vorher für 1 Wolle einen Spähtrupp (🔭 in der Bauleiste), dann siehst nur du es.",
+            });
+          }}
+        >
           ?
         </text>
       )}
@@ -651,18 +735,63 @@ function TilePiece({
       {/* The tile says what it produces, in the same pixel art as the hand —
           upper left so it never fights with the number token. */}
       {tile.revealed && tile.terrain !== "desert" && tile.terrain !== "unknown" && (
-        <ResourceSpriteAt
-          resource={tile.terrain as ResourceType}
-          x={center.x - size * 0.46}
-          y={center.y - size * 0.3}
-          size={size * 0.38}
-        />
+        <g
+          className={onInspect ? "inspectable" : undefined}
+          onClick={(e) => {
+            if (!onInspect) return;
+            e.stopPropagation();
+            onInspect({
+              title: `${TERRAIN_NAMES_DE[tile.terrain]}-Feld`,
+              text: `Liefert ${TERRAIN_NAMES_DE[tile.terrain]} an jede Siedlung an seinen Ecken — eine Stadt bekommt das Doppelte.`,
+            });
+          }}
+        >
+          <ResourceSpriteAt
+            resource={tile.terrain as ResourceType}
+            x={center.x - size * 0.46}
+            y={center.y - size * 0.3}
+            size={size * 0.38}
+          />
+        </g>
       )}
       {tile.revealed && tile.numberRevealed && tile.numberToken !== null && (
-        <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
+        <g
+          className={onInspect ? "inspectable" : undefined}
+          onClick={(e) => {
+            if (!onInspect || tile.numberToken === null) return;
+            e.stopPropagation();
+            const pips = 6 - Math.abs(7 - tile.numberToken);
+            onInspect({
+              title: `Zahl ${tile.numberToken}`,
+              text: `Wird diese Summe gewürfelt, liefert das Feld ${TERRAIN_NAMES_DE[tile.terrain]}. Die Punkte unter der Zahl zeigen, wie oft das vorkommt: ${pips} von 5 — je mehr Punkte, desto häufiger.`,
+            });
+          }}
+        >
+          <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
+        </g>
       )}
       {tile.revealed && tile.port && (
-        <text x={center.x} y={center.y + size * 0.6} textAnchor="middle" className="port-glyph">
+        <text
+          x={center.x}
+          y={center.y + size * 0.6}
+          textAnchor="middle"
+          className={`port-glyph ${onInspect ? "inspectable" : ""}`}
+          onClick={(e) => {
+            if (!onInspect || !tile.port) return;
+            e.stopPropagation();
+            onInspect(
+              tile.port.resource === "any"
+                ? {
+                    title: "Hafen 3:1",
+                    text: "Baust du eine Siedlung an diese Küste, darfst du hier 3 gleiche Rohstoffe gegen 1 beliebigen tauschen — statt der üblichen 4:1 bei der Bank.",
+                  }
+                : {
+                    title: `Hafen 2:1 (${TERRAIN_NAMES_DE[tile.port.resource]})`,
+                    text: `Baust du eine Siedlung an diese Küste, tauschst du hier 2 ${TERRAIN_NAMES_DE[tile.port.resource]} gegen 1 beliebigen Rohstoff.`,
+                  },
+            );
+          }}
+        >
           ⚓{tile.port.resource === "any" ? "3:1" : "2:1"}
         </text>
       )}

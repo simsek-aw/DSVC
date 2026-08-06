@@ -1311,3 +1311,41 @@ body {
   fill: #f1faee;
   pointer-events: none;
 }
+
+/* Tap-to-explain: anything on the map that carries a rule (ports, robber,
+   number chips) can be tapped for a one-paragraph explanation. */
+.inspectable {
+  cursor: pointer;
+  /* Beats the `pointer-events: none` on the glyph classes above, which exists
+     so decoration doesn't swallow taps meant for the tile. */
+  pointer-events: auto;
+}
+
+.map-info-card {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 40;
+  background: rgba(13, 27, 30, 0.96);
+  border: 1px solid #2a9d8f;
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.map-info-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #f1faee;
+}
+
+.map-info-card p {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #a8dadc;
+}

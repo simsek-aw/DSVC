@@ -27,7 +27,7 @@ interface Props {
   sendAction: (action: any) => void;
   freeRoadEdges?: EdgeId[];
   onSelectFreeRoadEdge?: (edge: EdgeId) => void;
-  onInspect?: (info: MapInfo) => void;
+  onInspect?: (info: MapInfo | null) => void;
 }
 
 /** Short explanation of a map element, shown when the player taps it. */
@@ -175,6 +175,7 @@ export function HexBoard({
       onPointerLeave={endPointer}
       onPointerCancel={endPointer}
       onWheel={onWheel}
+      onClick={() => onInspect?.(null)}
     >
       <WaterPattern
         view={view}
@@ -735,40 +736,15 @@ function TilePiece({
       {/* The tile says what it produces, in the same pixel art as the hand —
           upper left so it never fights with the number token. */}
       {tile.revealed && tile.terrain !== "desert" && tile.terrain !== "unknown" && (
-        <g
-          className={onInspect ? "inspectable" : undefined}
-          onClick={(e) => {
-            if (!onInspect) return;
-            e.stopPropagation();
-            onInspect({
-              title: `${TERRAIN_NAMES_DE[tile.terrain]}-Feld`,
-              text: `Liefert ${TERRAIN_NAMES_DE[tile.terrain]} an jede Siedlung an seinen Ecken — eine Stadt bekommt das Doppelte.`,
-            });
-          }}
-        >
-          <ResourceSpriteAt
-            resource={tile.terrain as ResourceType}
-            x={center.x - size * 0.46}
-            y={center.y - size * 0.3}
-            size={size * 0.38}
-          />
-        </g>
+        <ResourceSpriteAt
+          resource={tile.terrain as ResourceType}
+          x={center.x - size * 0.46}
+          y={center.y - size * 0.3}
+          size={size * 0.38}
+        />
       )}
       {tile.revealed && tile.numberRevealed && tile.numberToken !== null && (
-        <g
-          className={onInspect ? "inspectable" : undefined}
-          onClick={(e) => {
-            if (!onInspect || tile.numberToken === null) return;
-            e.stopPropagation();
-            const pips = 6 - Math.abs(7 - tile.numberToken);
-            onInspect({
-              title: `Zahl ${tile.numberToken}`,
-              text: `Wird diese Summe gewürfelt, liefert das Feld ${TERRAIN_NAMES_DE[tile.terrain]}. Die Punkte unter der Zahl zeigen, wie oft das vorkommt: ${pips} von 5 — je mehr Punkte, desto häufiger.`,
-            });
-          }}
-        >
-          <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
-        </g>
+        <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
       )}
       {tile.revealed && tile.port && <PortBerth tile={tile} center={center} size={size} onInspect={onInspect} />}
     </g>
@@ -822,15 +798,23 @@ function PortBerth({
         );
       }}
     >
-      <line
-        x1={mid.x}
-        y1={mid.y}
-        x2={berth.x}
-        y2={berth.y}
-        stroke="#8a4e15"
-        strokeWidth={Math.max(2, size * 0.07)}
-        strokeLinecap="round"
-      />
+      {/* Two mooring lines, one to each corner of the port's edge: those are
+          exactly the two spots where a settlement gets to use the harbour. */}
+      {[a, b].map((v, i) => (
+        <line
+          key={i}
+          x1={v.x * size}
+          y1={v.y * size}
+          x2={berth.x}
+          y2={berth.y}
+          stroke="#8a4e15"
+          strokeWidth={Math.max(1.5, size * 0.05)}
+          strokeLinecap="round"
+        />
+      ))}
+      {[a, b].map((v, i) => (
+        <circle key={`dot${i}`} cx={v.x * size} cy={v.y * size} r={Math.max(1.5, size * 0.06)} fill="#8a4e15" />
+      ))}
       <ShipSpriteAt x={berth.x} y={berth.y} size={size * 0.46} />
       {twoForOne && (
         <ResourceSpriteAt resource={port.resource as ResourceType} x={berth.x - size * 0.2} y={labelY} size={size * 0.26} />

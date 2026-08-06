@@ -169,14 +169,19 @@ export function generateMap(options: MapGenOptions): GeneratedMap {
   const openSea = openSeaCoords(tiles.map((t) => t.coord), coordSet);
 
   // Every (tile, sea-facing edge) pair that could carry a port. The water on
-  // the far side has to be roomy as well as reachable: a one-hex nook between
-  // two headlands is open sea by the flood fill, but no place to moor a ship.
-  const roomy = (c: AxialCoord) => axialNeighbors(c).filter((n) => !coordSet.has(axialKey(n))).length >= 3;
+  // the far side has to be roomy as well as reachable: a narrow bay between two
+  // headlands is open sea by the flood fill, but no place to moor a ship — and
+  // on screen the beach ring closes it up anyway. So the sea has to be at least
+  // two hexes deep straight out from the coast, and the near hex mostly water.
+  const isSea = (c: AxialCoord) => !coordSet.has(axialKey(c));
   const berths: { tile: Tile; edge: [VertexId, VertexId] }[] = [];
   for (const tile of tiles) {
     if (tile.terrain === "desert") continue;
     for (const neighbor of axialNeighbors(tile.coord)) {
-      if (!openSea.has(axialKey(neighbor)) || !roomy(neighbor)) continue;
+      if (!openSea.has(axialKey(neighbor))) continue;
+      const beyond = { q: neighbor.q * 2 - tile.coord.q, r: neighbor.r * 2 - tile.coord.r };
+      if (!isSea(beyond)) continue;
+      if (axialNeighbors(neighbor).filter(isSea).length < 3) continue;
       const edge = sharedEdge(tile.coord, neighbor, size);
       if (edge) berths.push({ tile, edge });
     }

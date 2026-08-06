@@ -569,17 +569,26 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       next = revealTilesTouching(next, action.vertex, playerId);
       next = updatePlayer(next, playerId, (p) => ({ ...p, victoryPoints: p.victoryPoints + 1 }));
 
-      // Second settlement of setup grants immediate starting resources (classic Catan rule).
+      // Second settlement of setup grants immediate starting resources (classic
+      // Catan rule): one of each resource the settlement's tiles produce.
       if (state.setupRound === 2) {
+        const gained: Partial<Record<ResourceType, number>> = {};
         for (const coord of tilesTouchingVertex(graph, action.vertex)) {
           const tile = findTile(next, coord);
           if (tile.terrain === "desert") continue;
           const resource = tile.terrain as ResourceType;
+          gained[resource] = (gained[resource] ?? 0) + 1;
           next = updatePlayer(next, playerId, (p) => ({
             ...p,
             resources: { ...p.resources, [resource]: p.resources[resource] + 1 },
           }));
         }
+        const parts = RESOURCE_TYPES.filter((r) => gained[r]).map((r) => `${gained[r]}× ${TERRAIN_NAMES_DE[r]}`);
+        const player = next.players.find((p) => p.id === playerId);
+        next = {
+          ...next,
+          log: [...next.log, parts.length ? `🎁 ${player?.name} erhält Startrohstoffe: ${parts.join(", ")}.` : `🎁 ${player?.name} erhält keine Startrohstoffe (nur Wüste).`],
+        };
       }
 
       return next;

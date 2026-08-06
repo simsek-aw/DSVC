@@ -46,7 +46,7 @@ const RESOURCE_NAMES: Record<ResourceType, string> = {
 };
 
 // Leading emojis the engine puts on "big play" log lines worth a popup.
-const ANNOUNCE_EMOJIS = ["⚔️", "🏅", "🛣️", "📈", "💡", "🛤️", "💰"];
+const ANNOUNCE_EMOJIS = ["⚔️", "🏅", "🛣️", "📈", "💡", "🛤️", "💰", "🎁"];
 
 // A resource sprite in flight from a producing tile to its resource chip.
 interface Flight {
@@ -321,6 +321,33 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     return out;
   };
 
+  // Flights for the starting resources: one sprite per non-desert tile around
+  // the settlement just placed, so setup collection is as visible as a harvest.
+  const spawnSetupFlights = (): Flight[] => {
+    const api = boardApiRef.current;
+    if (!api) return [];
+    const myLast = [...state.buildings].reverse().find((b) => b.ownerId === myPlayerId);
+    if (!myLast) return [];
+    const graph = buildBoardGraph(state.tiles, TILE_SIZE);
+    const out: Flight[] = [];
+    for (const coord of tilesTouchingVertex(graph, myLast.vertex)) {
+      const tile = state.tiles.find((t) => axialKey(t.coord) === axialKey(coord));
+      if (!tile || !tile.revealed || tile.terrain === "desert" || tile.terrain === "unknown") continue;
+      const from = api.getTileScreenPos(tile.coord);
+      const chip = chipRefs.current[tile.terrain as ResourceType]?.getBoundingClientRect();
+      if (!from || !chip) continue;
+      out.push({
+        id: `${Date.now()}-setup-${axialKey(tile.coord)}-${Math.random()}`,
+        resource: tile.terrain as ResourceType,
+        x0: from.x,
+        y0: from.y,
+        x1: chip.x + chip.width / 2,
+        y1: chip.y + chip.height / 2,
+      });
+    }
+    return out;
+  };
+
   // Resource gains: a floating "+N" per resource that increased. When the gain
   // comes from dice production, a sprite first flies out of each producing tile
   // into the matching resource, and the "+N" only pops once it lands.
@@ -346,7 +373,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     const roll = state.lastDiceRoll;
     const rollKey = roll ? `${roll.die1}-${roll.die2}-${state.currentPlayerIndex}` : "";
     const isProduction = !!roll && roll.total !== 7 && rollKey !== prodRollRef.current;
-    const spawned = isProduction ? spawnHarvestFlights(roll!.total) : [];
+    const spawned = isProduction ? spawnHarvestFlights(roll!.total) : state.phase === "setup" ? spawnSetupFlights() : [];
 
     if (spawned.length > 0) {
       prodRollRef.current = rollKey;

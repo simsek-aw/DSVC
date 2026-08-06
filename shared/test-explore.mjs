@@ -103,7 +103,17 @@ const relicTile = s2.tiles.find((t) => t.treasure === "relic");
 s2 = { ...s2, phase: "setup", setupRound: 1, currentPlayerIndex: 0, setupStepAwaitingRoad: false };
 const who = s2.turnOrder[0];
 
-const cacheVert = tileVertices(cacheTile.coord, TILE_SIZE)[0];
+// Pick a vertex the board graph agrees touches the tile — a raw tileVertices[0]
+// can miss by a rounding hair and then reveal a neighbour instead of the tile.
+const graph2 = buildBoardGraph(s2.tiles, TILE_SIZE);
+const vertexTouching = (coord) => {
+  for (const v of graph2.vertices.values()) {
+    if (tilesTouchingVertex(graph2, v).some((c) => axialKey(c) === axialKey(coord))) return v;
+  }
+  return tileVertices(coord, TILE_SIZE)[0];
+};
+
+const cacheVert = vertexTouching(cacheTile.coord);
 const before = s2.players.find((p) => p.id === who).resources[cacheTile.terrain];
 s2 = applyAction(s2, who, { type: "placeSetupSettlement", vertex: cacheVert });
 const after = s2.players.find((p) => p.id === who).resources[cacheTile.terrain];
@@ -112,8 +122,16 @@ assert(after >= before + 2, `Versteck bringt 2x ${cacheTile.terrain} (${before} 
 assert(s2.tiles.find((t) => axialKey(t.coord) === axialKey(cacheTile.coord)).treasure === null, "Fund ist verbraucht");
 
 // Reveal the relic tile too (fresh state so placement rules don't collide).
-let s3 = { ...s2, buildings: [], setupStepAwaitingRoad: false, setupRound: 1 };
-const relicVert = tileVertices(relicTile.coord, TILE_SIZE)[0];
+// Force the relic tile back to its unrevealed, still-buried state — the cache
+// sub-test above may have happened to sit next to it and already reveal it.
+let s3 = {
+  ...s2,
+  buildings: [],
+  setupStepAwaitingRoad: false,
+  setupRound: 1,
+  tiles: s2.tiles.map((t) => (axialKey(t.coord) === axialKey(relicTile.coord) ? { ...t, treasure: "relic", revealed: false } : t)),
+};
+const relicVert = vertexTouching(relicTile.coord);
 const cardsBefore = s3.players.find((p) => p.id === who).developmentCards.length;
 s3 = applyAction(s3, who, { type: "placeSetupSettlement", vertex: relicVert });
 const cardsAfter = s3.players.find((p) => p.id === who).developmentCards.length;

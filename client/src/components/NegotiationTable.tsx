@@ -1,12 +1,5 @@
 import { GameState, ResourceType, RESOURCE_TYPES } from "@canos/shared";
-
-const RESOURCE_ICONS: Record<ResourceType, string> = {
-  wood: "🪵",
-  brick: "🧱",
-  ore: "⛏️",
-  wheat: "🌾",
-  sheep: "🐑",
-};
+import { ResourceSprite } from "./PixelIcons";
 
 interface Props {
   state: GameState;
@@ -79,7 +72,7 @@ export function NegotiationTable({ state, myPlayerId, sendAction }: Props) {
           <div className="table-slots">
             {RESOURCE_TYPES.filter((r) => (theirOffer[r] ?? 0) > 0).map((r) => (
               <span key={r} className="table-slot">
-                {RESOURCE_ICONS[r]} {theirOffer[r]}
+                <ResourceSprite resource={r} size={18} /> {theirOffer[r]}
               </span>
             ))}
             {RESOURCE_TYPES.every((r) => !(theirOffer[r] ?? 0)) && <span className="table-empty">— noch nichts —</span>}
@@ -96,7 +89,7 @@ export function NegotiationTable({ state, myPlayerId, sendAction }: Props) {
                 title="Zurücknehmen"
                 onClick={() => sendAction({ type: "changeNegotiationOffer", resource: r, delta: -1 })}
               >
-                {RESOURCE_ICONS[r]} {myOffer[r]} ✕
+                <ResourceSprite resource={r} size={18} /> {myOffer[r]} ✕
               </button>
             ))}
             {RESOURCE_TYPES.every((r) => !(myOffer[r] ?? 0)) && <span className="table-empty">— noch nichts —</span>}
@@ -114,7 +107,9 @@ export function NegotiationTable({ state, myPlayerId, sendAction }: Props) {
                   disabled={available <= 0}
                   onClick={() => sendAction({ type: "changeNegotiationOffer", resource: r, delta: 1 })}
                 >
-                  <span className="resource-icon">{RESOURCE_ICONS[r]}</span>
+                  <span className="resource-icon">
+                    <ResourceSprite resource={r} size={24} />
+                  </span>
                   <span className="resource-count">{available}</span>
                 </button>
               );

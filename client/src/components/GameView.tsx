@@ -3,6 +3,7 @@ import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESO
 import { HexBoard, BuildMode } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
+import { ResourceSprite } from "./PixelIcons";
 
 interface Props {
   state: GameState;
@@ -19,12 +20,12 @@ const RESOURCE_LABELS: Record<ResourceType, string> = {
   sheep: "🐑 Wolle",
 };
 
-const RESOURCE_ICONS: Record<ResourceType, string> = {
-  wood: "🪵",
-  brick: "🧱",
-  ore: "⛏️",
-  wheat: "🌾",
-  sheep: "🐑",
+const RESOURCE_NAMES: Record<ResourceType, string> = {
+  wood: "Holz",
+  brick: "Lehm",
+  ore: "Erz",
+  wheat: "Weizen",
+  sheep: "Wolle",
 };
 
 const CARD_LABELS: Record<DevelopmentCardType, string> = {
@@ -344,7 +345,9 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                       +{g.amount}
                     </span>
                   ))}
-                <span className="resource-icon">{RESOURCE_ICONS[key]}</span>
+                <span className="resource-icon">
+                  <ResourceSprite resource={key} size={26} />
+                </span>
                 <span className="resource-count">{me.resources[key]}</span>
               </div>
             ))}
@@ -374,7 +377,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         {request && iAmRequester && !incomingTrade && (
           <div className="request-banner own">
             <span>
-              Du suchst {RESOURCE_ICONS[request.resource]} {RESOURCE_LABELS[request.resource].split(" ")[1]} — warte auf Angebote …
+              Du suchst <ResourceSprite resource={request.resource} size={18} /> {RESOURCE_NAMES[request.resource]} — warte auf
+              Angebote …
             </span>
             <button className="small" onClick={() => sendAction({ type: "cancelResourceRequest" })}>
               Abbrechen
@@ -385,13 +389,13 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         {canAnswerRequest && request && (
           <div className="request-banner">
             <span>
-              {requester?.name} braucht {RESOURCE_ICONS[request.resource]}{" "}
-              {RESOURCE_LABELS[request.resource].split(" ")[1]} — was willst du dafür?
+              {requester?.name} braucht <ResourceSprite resource={request.resource} size={18} />{" "}
+              {RESOURCE_NAMES[request.resource]} — was willst du dafür?
             </span>
             <div className="request-options">
               {RESOURCE_TYPES.filter((r) => r !== request.resource).map((r) => (
                 <button key={r} onClick={() => sendAction({ type: "offerQuickTrade", wantInReturn: r })} title={RESOURCE_LABELS[r]}>
-                  {RESOURCE_ICONS[r]}
+                  <ResourceSprite resource={r} size={24} />
                 </button>
               ))}
             </div>
@@ -693,7 +697,7 @@ function BuildTile({
       <span className="build-tile-cost">
         {RESOURCE_TYPES.filter((r) => (cost[r] ?? 0) > 0).map((r) => (
           <span key={r} className="build-tile-cost-item">
-            {RESOURCE_ICONS[r]}
+            <ResourceSprite resource={r} size={12} />
             {cost[r]}
           </span>
         ))}

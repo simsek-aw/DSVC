@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { GameState, ResourceType, RESOURCE_TYPES } from "@canos/shared";
-
-const RESOURCE_ICONS: Record<ResourceType, string> = {
-  wood: "🪵",
-  brick: "🧱",
-  ore: "⛏️",
-  wheat: "🌾",
-  sheep: "🐑",
-};
+import { ResourceSprite } from "./PixelIcons";
 
 interface Props {
   state: GameState;
@@ -37,7 +30,9 @@ export function DiscardPanel({ state, myPlayerId, sendAction }: Props) {
             const chosen = picked[r] ?? 0;
             return (
               <div key={r} className="discard-cell">
-                <span className="resource-icon">{RESOURCE_ICONS[r]}</span>
+                <span className="resource-icon">
+                    <ResourceSprite resource={r} size={24} />
+                  </span>
                 <span className="discard-count">
                   {have - chosen}
                   {chosen > 0 && <span className="discard-chosen"> −{chosen}</span>}

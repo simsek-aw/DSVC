@@ -357,6 +357,97 @@ function rippleRects(yTop: number, phase: number, bright: boolean, key: number, 
   return out;
 }
 
+// Pixel textures for the land, in the same handheld-RPG register as the sea:
+// a flat base colour with a handful of darker and lighter marks that read as
+// canopy, brickwork, rock facets, crop rows and tufts of grass.
+const TERRAIN_CELL = 4;
+const TERRAIN_GRID = 8;
+
+type Mark = [number, number, number, number, string]; // x, y, w, h, colour
+
+const TERRAIN_TEXTURES: Record<string, { base: string; marks: Mark[] }> = {
+  wood: {
+    base: "#2d6a4f",
+    marks: [
+      [1, 1, 2, 2, "#52b788"], [0, 3, 1, 1, "#1b4332"], [3, 0, 1, 1, "#52b788"],
+      [5, 3, 2, 2, "#52b788"], [4, 5, 1, 1, "#1b4332"], [7, 2, 1, 1, "#52b788"],
+      [2, 5, 2, 2, "#52b788"], [1, 7, 1, 1, "#1b4332"], [6, 6, 1, 1, "#52b788"],
+    ],
+  },
+  brick: {
+    base: "#bc6c25",
+    marks: [
+      [0, 1, 3, 1, "#8a4e15"], [4, 1, 3, 1, "#8a4e15"],
+      [2, 3, 3, 1, "#8a4e15"], [6, 3, 2, 1, "#8a4e15"],
+      [0, 5, 3, 1, "#8a4e15"], [4, 5, 3, 1, "#8a4e15"],
+      [1, 2, 1, 1, "#d98c46"], [5, 4, 1, 1, "#d98c46"], [3, 6, 1, 1, "#d98c46"],
+    ],
+  },
+  ore: {
+    base: "#6c757d",
+    marks: [
+      [1, 1, 2, 1, "#adb5bd"], [2, 2, 2, 1, "#495057"],
+      [5, 2, 2, 1, "#adb5bd"], [6, 3, 1, 1, "#495057"],
+      [2, 5, 2, 1, "#adb5bd"], [3, 6, 2, 1, "#495057"],
+      [6, 6, 1, 1, "#adb5bd"], [0, 4, 1, 1, "#495057"],
+    ],
+  },
+  wheat: {
+    base: "#e9c46a",
+    marks: [
+      [1, 0, 1, 3, "#c9a227"], [3, 1, 1, 3, "#c9a227"], [5, 0, 1, 3, "#c9a227"],
+      [7, 2, 1, 3, "#c9a227"], [0, 4, 1, 3, "#c9a227"], [2, 5, 1, 3, "#c9a227"],
+      [4, 4, 1, 3, "#c9a227"], [6, 5, 1, 3, "#c9a227"],
+      [2, 2, 1, 1, "#f7e2a8"], [6, 1, 1, 1, "#f7e2a8"], [3, 6, 1, 1, "#f7e2a8"],
+    ],
+  },
+  sheep: {
+    base: "#a7c957",
+    marks: [
+      [2, 1, 1, 1, "#6a994e"], [1, 2, 2, 1, "#6a994e"],
+      [6, 2, 1, 1, "#6a994e"], [5, 3, 2, 1, "#6a994e"],
+      [3, 5, 1, 1, "#6a994e"], [2, 6, 2, 1, "#6a994e"],
+      [0, 0, 1, 1, "#c9e07a"], [7, 5, 1, 1, "#c9e07a"], [4, 3, 1, 1, "#c9e07a"],
+    ],
+  },
+  desert: {
+    base: "#d4a373",
+    marks: [
+      [0, 2, 4, 1, "#b8814e"], [5, 1, 3, 1, "#b8814e"],
+      [2, 5, 4, 1, "#b8814e"], [6, 6, 2, 1, "#b8814e"],
+      [3, 3, 2, 1, "#b8814e"], [0, 7, 3, 1, "#b8814e"],
+      [1, 1, 1, 1, "#e8c8a5"], [4, 4, 1, 1, "#e8c8a5"], [7, 3, 1, 1, "#e8c8a5"],
+    ],
+  },
+};
+
+/** One repeating texture per terrain, scaled to match the current zoom. */
+function TerrainPatterns({ scale }: { scale: number }) {
+  const size = TERRAIN_GRID * TERRAIN_CELL;
+  // Tiles live inside the board's translated group, so the pattern already
+  // travels with the map; only the zoom has to be applied here.
+  const transform = `scale(${scale / 48})`;
+  return (
+    <>
+      {Object.entries(TERRAIN_TEXTURES).map(([terrain, { base, marks }]) => (
+        <pattern
+          key={terrain}
+          id={`terrain-${terrain}`}
+          width={size}
+          height={size}
+          patternUnits="userSpaceOnUse"
+          patternTransform={transform}
+        >
+          <rect width={size} height={size} fill={base} />
+          {marks.map(([x, y, w, h, c], i) => (
+            <rect key={i} x={x * TERRAIN_CELL} y={y * TERRAIN_CELL} width={w * TERRAIN_CELL} height={h * TERRAIN_CELL} fill={c} />
+          ))}
+        </pattern>
+      ))}
+    </>
+  );
+}
+
 /**
  * The sea is drawn as a repeating pattern that carries the board's own pan and
  * zoom, so dragging the map drags the water with it rather than sliding the
@@ -371,6 +462,7 @@ function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: nu
         <rect width={size} height={size} fill={WATER_BASE} />
         {WAVE_ROWS.map(([yTop, phase, bright], i) => rippleRects(yTop, phase, bright, i, WATER_CELL))}
       </pattern>
+      <TerrainPatterns scale={view.scale} />
       {/* Darkens the edges so the island stays the focus. */}
       <radialGradient id="waterVignette" cx="50%" cy="42%" r="75%">
         <stop offset="0%" stopColor="#0d1b1e" stopOpacity="0" />
@@ -410,7 +502,11 @@ function TilePiece({
   // A scouted tile shows its terrain only to the player who paid for the look,
   // dimmed and dashed so it stays visibly "not officially uncovered yet".
   const known = tile.revealed || scouted;
-  const fill = known ? TERRAIN_COLORS[tile.terrain] : "#1b263b";
+  const fill = known
+    ? TERRAIN_TEXTURES[tile.terrain]
+      ? `url(#terrain-${tile.terrain})`
+      : TERRAIN_COLORS[tile.terrain]
+    : "#1b263b";
 
   return (
     <g onClick={onClickTile} className="tile-group">

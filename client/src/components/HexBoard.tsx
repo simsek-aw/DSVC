@@ -688,12 +688,14 @@ function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: nu
               <path key={i} d={d} fill="none" stroke="#bff0f7" strokeWidth={1.1} strokeLinecap="round" opacity={0.5} />
             ))}
           </pattern>
-          {/* A light zig-zag hatch to give each land tile a hint of texture. */}
+          {/* A light zig-zag hatch — used for desert/unknown and the fallback. */}
           <pattern id="zacken" width={ZACKEN_W} height={ZACKEN_H} patternUnits="userSpaceOnUse" patternTransform={`scale(${view.scale / 48})`}>
             {ZACKEN_PATH.map((d, i) => (
               <path key={i} d={d} fill="none" stroke="#ffffff" strokeWidth={1} strokeLinecap="round" />
             ))}
           </pattern>
+          {/* Per-terrain line motifs (trees, stalks, clouds, bricks, rocks). */}
+          <FlatMotifPatterns scale={view.scale} />
         </>
       ) : (
         <>
@@ -712,6 +714,82 @@ function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: nu
 
 function scalePoint(v: VertexId, scale: number) {
   return { x: v.x * scale, y: v.y * scale };
+}
+
+// Which terrains get their own line motif; the rest fall back to the zig-zag.
+const TERRAIN_MOTIFS = new Set(["wood", "brick", "ore", "wheat", "sheep"]);
+
+/**
+ * One faint line-art pattern per land terrain, so a flat field still hints at
+ * what it is: little pines on wood, stalks on wheat, clouds on wool, brick
+ * coursing on brick, angular rocks on ore. Drawn in a darker shade of the
+ * terrain at low opacity, and scaled to the current zoom like the tiles.
+ */
+function FlatMotifPatterns({ scale }: { scale: number }) {
+  const t = `scale(${scale / 48})`;
+  const S = 24; // pattern cell size in board units (pre-zoom)
+  const common = {
+    fill: "none" as const,
+    strokeWidth: 1,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeOpacity: 0.4,
+  };
+  const motif: Record<string, JSX.Element> = {
+    // Two little pine trees.
+    wood: (
+      <g stroke={shade(TERRAIN_COLORS.wood, 0.5)} {...common}>
+        <path d="M4 12 L7 5 L10 12 Z" />
+        <line x1="7" y1="12" x2="7" y2="15" />
+        <path d="M15 21 L18 14 L21 21 Z" />
+        <line x1="18" y1="21" x2="18" y2="24" />
+      </g>
+    ),
+    // Brick coursing.
+    brick: (
+      <g stroke={shade(TERRAIN_COLORS.brick, 0.55)} {...common}>
+        <line x1="0" y1="8" x2="24" y2="8" />
+        <line x1="0" y1="16" x2="24" y2="16" />
+        <line x1="8" y1="0" x2="8" y2="8" />
+        <line x1="18" y1="0" x2="18" y2="8" />
+        <line x1="3" y1="8" x2="3" y2="16" />
+        <line x1="13" y1="8" x2="13" y2="16" />
+        <line x1="8" y1="16" x2="8" y2="24" />
+        <line x1="18" y1="16" x2="18" y2="24" />
+      </g>
+    ),
+    // A couple of angular rocks.
+    ore: (
+      <g stroke={shade(TERRAIN_COLORS.ore, 0.5)} {...common}>
+        <path d="M3 16 L5 9 L11 10 L13 15 L8 18 Z" />
+        <path d="M15 7 L18 3 L22 6 L20 11 L16 10 Z" />
+      </g>
+    ),
+    // Three fanned stalks, twice.
+    wheat: (
+      <g stroke={shade(TERRAIN_COLORS.wheat, 0.5)} {...common}>
+        <path d="M6 16 L4 7 M6 16 L6 6 M6 16 L8 7" />
+        <path d="M6 8 L4.5 9 M6 7 L4.5 8 M6 8 L7.5 9 M6 7 L7.5 8" strokeWidth={0.7} />
+        <path d="M17 23 L15 14 M17 23 L17 13 M17 23 L19 14" />
+      </g>
+    ),
+    // Little cloud puffs.
+    sheep: (
+      <g stroke={shade(TERRAIN_COLORS.sheep, 0.5)} {...common}>
+        <path d="M3 12 q0 -3 3 -3 q1 -3 4 -2 q3 -1 3 2 q3 0 1 3 Z" />
+        <path d="M14 20 q0 -2.5 2.5 -2.5 q1 -2.5 3.5 -1.5 q2.5 -0.5 1 2.5 Z" />
+      </g>
+    ),
+  };
+  return (
+    <>
+      {Array.from(TERRAIN_MOTIFS).map((terrain) => (
+        <pattern key={terrain} id={`tex-${terrain}`} width={S} height={S} patternUnits="userSpaceOnUse" patternTransform={t}>
+          {motif[terrain]}
+        </pattern>
+      ))}
+    </>
+  );
 }
 
 /** Darkens a hex colour for outlines and shading, keeping it in the same hue. */
@@ -840,10 +918,13 @@ function TilePiece({
         strokeWidth={1.5}
         strokeDasharray={scouted && !tile.revealed ? "4 3" : undefined}
       />
-      {/* A faint zig-zag hatch gives the flat tile a bit of texture. */}
-      {FLAT && known && (
-        <polygon points={points} fill="url(#zacken)" opacity={0.1} pointerEvents="none" />
-      )}
+      {/* A faint terrain motif (or zig-zag fallback) gives the flat tile texture. */}
+      {FLAT && known &&
+        (TERRAIN_MOTIFS.has(tile.terrain) ? (
+          <polygon points={points} fill={`url(#tex-${tile.terrain})`} pointerEvents="none" />
+        ) : (
+          <polygon points={points} fill="url(#zacken)" opacity={0.1} pointerEvents="none" />
+        ))}
       {harvesting && (
         <polygon key={harvestKey} className="harvest-pulse" points={points} pointerEvents="none" />
       )}

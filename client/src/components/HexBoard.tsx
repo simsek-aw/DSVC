@@ -16,7 +16,7 @@ import {
   hexCorners,
   vertexKey,
 } from "@canos/shared";
-import { MarkerKind, MarkerSpriteAt, NumberChipAt, ResourceSpriteAt } from "./PixelIcons";
+import { MarkerKind, MarkerSpriteAt, NumberChipAt, ResourceSpriteAt, ShipSpriteAt } from "./PixelIcons";
 
 export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout";
 
@@ -770,31 +770,81 @@ function TilePiece({
           <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
         </g>
       )}
-      {tile.revealed && tile.port && (
-        <text
-          x={center.x}
-          y={center.y + size * 0.6}
-          textAnchor="middle"
-          className={`port-glyph ${onInspect ? "inspectable" : ""}`}
-          onClick={(e) => {
-            if (!onInspect || !tile.port) return;
-            e.stopPropagation();
-            onInspect(
-              tile.port.resource === "any"
-                ? {
-                    title: "Hafen 3:1",
-                    text: "Baust du eine Siedlung an diese Küste, darfst du hier 3 gleiche Rohstoffe gegen 1 beliebigen tauschen — statt der üblichen 4:1 bei der Bank.",
-                  }
-                : {
-                    title: `Hafen 2:1 (${TERRAIN_NAMES_DE[tile.port.resource]})`,
-                    text: `Baust du eine Siedlung an diese Küste, tauschst du hier 2 ${TERRAIN_NAMES_DE[tile.port.resource]} gegen 1 beliebigen Rohstoff.`,
-                  },
-            );
-          }}
-        >
-          ⚓{tile.port.resource === "any" ? "3:1" : "2:1"}
-        </text>
+      {tile.revealed && tile.port && <PortBerth tile={tile} center={center} size={size} onInspect={onInspect} />}
+    </g>
+  );
+}
+
+/**
+ * A port drawn where it belongs: out on the water beside its tile, not on top
+ * of the terrain. The berth sits on the outward side of the coastal edge the
+ * port was placed on, with a short jetty back to the shore.
+ */
+function PortBerth({
+  tile,
+  center,
+  size,
+  onInspect,
+}: {
+  tile: Tile;
+  center: { x: number; y: number };
+  size: number;
+  onInspect?: (info: MapInfo) => void;
+}) {
+  const port = tile.port;
+  if (!port) return null;
+
+  const [a, b] = port.edgeVertices;
+  const mid = { x: ((a.x + b.x) / 2) * size, y: ((a.y + b.y) / 2) * size };
+  const dx = mid.x - center.x;
+  const dy = mid.y - center.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const berth = { x: mid.x + (dx / len) * size * 0.42, y: mid.y + (dy / len) * size * 0.42 };
+  const twoForOne = port.resource !== "any";
+  const labelY = berth.y + size * 0.36;
+
+  return (
+    <g
+      className={onInspect ? "inspectable" : undefined}
+      onClick={(e) => {
+        if (!onInspect) return;
+        e.stopPropagation();
+        onInspect(
+          twoForOne
+            ? {
+                title: `Hafen 2:1 (${TERRAIN_NAMES_DE[port.resource as ResourceType]})`,
+                text: `Baust du eine Siedlung an diese Küste, tauschst du hier 2 ${TERRAIN_NAMES_DE[port.resource as ResourceType]} gegen 1 beliebigen Rohstoff.`,
+              }
+            : {
+                title: "Hafen 3:1",
+                text: "Baust du eine Siedlung an diese Küste, darfst du hier 3 gleiche Rohstoffe gegen 1 beliebigen tauschen — statt der üblichen 4:1 bei der Bank.",
+              },
+        );
+      }}
+    >
+      <line
+        x1={mid.x}
+        y1={mid.y}
+        x2={berth.x}
+        y2={berth.y}
+        stroke="#8a4e15"
+        strokeWidth={Math.max(2, size * 0.07)}
+        strokeLinecap="round"
+      />
+      <ShipSpriteAt x={berth.x} y={berth.y} size={size * 0.46} />
+      {twoForOne && (
+        <ResourceSpriteAt resource={port.resource as ResourceType} x={berth.x - size * 0.2} y={labelY} size={size * 0.26} />
       )}
+      <text
+        x={twoForOne ? berth.x + size * 0.12 : berth.x}
+        y={labelY}
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="port-label"
+        fontSize={size * 0.26}
+      >
+        {port.ratio}:1
+      </text>
     </g>
   );
 }

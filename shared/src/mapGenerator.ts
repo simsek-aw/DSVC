@@ -1,4 +1,4 @@
-import { AxialCoord, axialKey, axialNeighbors, tileEdges } from "./hexGrid";
+import { AxialCoord, VertexId, axialKey, axialNeighbors, tileVertices, vertexKey } from "./hexGrid";
 import { ResourceType, Tile } from "./types";
 
 function shuffle<T>(arr: T[]): T[] {
@@ -161,25 +161,79 @@ export function generateMap(options: MapGenOptions): GeneratedMap {
     candidatesForBoost[Math.floor(Math.random() * candidatesForBoost.length)].hasBoostToken = true;
   }
 
-  // Ports: find coastline tiles (fewer than 6 neighbors placed) and scatter a handful of ports on them.
+  // Ports sit on the open coast: on the edge a tile actually shares with the
+  // outer sea. A landlocked lagoon inside the island is water too, but no ship
+  // could ever reach it, so those edges are excluded.
+  const size = options.tileSize ?? 1;
   const coordSet = new Set(tiles.map((t) => axialKey(t.coord)));
-  const coastalTiles = tiles.filter(
-    (t) => axialNeighbors(t.coord).some((n) => !coordSet.has(axialKey(n))) && t.terrain !== "desert"
-  );
+  const openSea = openSeaCoords(tiles.map((t) => t.coord), coordSet);
+
+  // Every (tile, sea-facing edge) pair that could carry a port. The water on
+  // the far side has to be roomy as well as reachable: a one-hex nook between
+  // two headlands is open sea by the flood fill, but no place to moor a ship.
+  const roomy = (c: AxialCoord) => axialNeighbors(c).filter((n) => !coordSet.has(axialKey(n))).length >= 3;
+  const berths: { tile: Tile; edge: [VertexId, VertexId] }[] = [];
+  for (const tile of tiles) {
+    if (tile.terrain === "desert") continue;
+    for (const neighbor of axialNeighbors(tile.coord)) {
+      if (!openSea.has(axialKey(neighbor)) || !roomy(neighbor)) continue;
+      const edge = sharedEdge(tile.coord, neighbor, size);
+      if (edge) berths.push({ tile, edge });
+    }
+  }
+
   const portResources: (ResourceType | "any")[] = ["any", "any", "any", "any", "wood", "brick", "ore", "wheat", "sheep"];
-  const shuffledCoastal = shuffle(coastalTiles);
-  const portCount = Math.min(portResources.length, Math.floor(coastalTiles.length / 2));
-  for (let i = 0; i < portCount; i++) {
-    const tile = shuffledCoastal[i];
-    const edges = tileEdges(tile.coord, options.tileSize ?? 1);
-    const edge = edges[Math.floor(Math.random() * edges.length)];
-    const resource = portResources[i];
-    tile.port = {
+  const shuffledBerths = shuffle(berths);
+  const portCount = Math.min(portResources.length, Math.floor(berths.length / 3));
+  let placed = 0;
+  for (const berth of shuffledBerths) {
+    if (placed >= portCount) break;
+    if (berth.tile.port) continue; // one port per tile
+    const resource = portResources[placed];
+    berth.tile.port = {
       resource,
       ratio: resource === "any" ? 3 : 2,
-      edgeVertices: [edge.a, edge.b],
+      edgeVertices: berth.edge,
     };
+    placed++;
   }
 
   return { tiles };
+}
+
+/**
+ * Flood-fills the sea from outside the island, so an enclosed lagoon can be
+ * told apart from the ocean. Works on a bounding box two rings larger than the
+ * land, which is enough room for the fill to wrap all the way around.
+ */
+function openSeaCoords(land: AxialCoord[], landSet: Set<string>): Set<string> {
+  const qs = land.map((c) => c.q);
+  const rs = land.map((c) => c.r);
+  const minQ = Math.min(...qs) - 2;
+  const maxQ = Math.max(...qs) + 2;
+  const minR = Math.min(...rs) - 2;
+  const maxR = Math.max(...rs) + 2;
+  const inBox = (c: AxialCoord) => c.q >= minQ && c.q <= maxQ && c.r >= minR && c.r <= maxR;
+
+  const start = { q: minQ, r: minR };
+  const open = new Set<string>();
+  const queue: AxialCoord[] = [start];
+  open.add(axialKey(start));
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const next of axialNeighbors(current)) {
+      const key = axialKey(next);
+      if (open.has(key) || landSet.has(key) || !inBox(next)) continue;
+      open.add(key);
+      queue.push(next);
+    }
+  }
+  return open;
+}
+
+/** The two corners two neighbouring hexes have in common. */
+function sharedEdge(a: AxialCoord, b: AxialCoord, size: number): [VertexId, VertexId] | null {
+  const bKeys = new Set(tileVertices(b, size).map(vertexKey));
+  const shared = tileVertices(a, size).filter((v) => bKeys.has(vertexKey(v)));
+  return shared.length === 2 ? [shared[0], shared[1]] : null;
 }

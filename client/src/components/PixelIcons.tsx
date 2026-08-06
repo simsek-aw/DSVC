@@ -182,6 +182,33 @@ const MARKER_RECTS: Record<MarkerKind, ReturnType<typeof spriteRects>> = {
   bribery: spriteRects(MARKER_SPRITES.bribery),
 };
 
+// A little sailing boat moored next to a port tile.
+const SHIP = spriteRects({
+  palette: { O: "#25313d", m: "#5a3a1a", S: "#f1faee", s: "#c9d6de", h: "#8a4e15" },
+  rows: [
+    "..........",
+    "....m.....",
+    "....mSS...",
+    "....mSSs..",
+    "....mSSSs.",
+    "....mSSSs.",
+    "....m.....",
+    "OhhhhhhhhO",
+    ".OhhhhhhO.",
+    "..OOOOOO..",
+  ],
+});
+
+export function ShipSpriteAt({ x, y, size }: { x: number; y: number; size: number }) {
+  return (
+    <g transform={`translate(${x - size / 2}, ${y - size / 2}) scale(${size / 10})`} shapeRendering="crispEdges">
+      {SHIP.map((r, i) => (
+        <rect key={i} x={r.x} y={r.y} width={r.w} height={1} fill={r.fill} />
+      ))}
+    </g>
+  );
+}
+
 export function MarkerSpriteAt({ kind, x, y, size }: { kind: MarkerKind; x: number; y: number; size: number }) {
   return (
     <g transform={`translate(${x - size / 2}, ${y - size / 2}) scale(${size / 10})`} shapeRendering="crispEdges">

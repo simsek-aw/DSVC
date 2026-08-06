@@ -210,6 +210,16 @@ body {
   pointer-events: none;
 }
 
+/* Ratio label under a port's boat — outlined so it stays readable on water. */
+.port-label {
+  fill: #f1faee;
+  font-weight: 700;
+  stroke: #0d1b1e;
+  stroke-width: 3px;
+  paint-order: stroke;
+  pointer-events: none;
+}
+
 .edge-hitbox {
   stroke: #f4a261;
   stroke-width: 10;

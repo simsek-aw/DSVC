@@ -25,24 +25,27 @@ function hash(x: number, y: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
 }
 
+const PERIOD = 8; // diamond size; divides the 32-grid so the tile stays seamless
+
 /**
- * Colour for one cell: a cyan base with soft blocky patches of lighter and
- * darker water, plus white "sparkle" pixels scattered mostly along broken
- * diagonals — the flowing-net look of the reference, without the rigid lattice.
+ * Colour for one cell: a bold white diamond net (2px lines) with lighter
+ * diamond interiors over a cyan base — the reference pattern — but the net is
+ * broken up by a deterministic hash so it reads as water, not a rigid grid.
  */
 function cellFill(x: number, y: number): string {
-  // Low-frequency patches (4x4 blocks) decide the base shade of the water.
-  const patch = hash(x >> 2, y >> 2);
-  let fill = WATER_BASE;
-  if (patch > 0.72) fill = WATER_LIGHT;
-  else if (patch < 0.16) fill = WATER_DEEP;
+  const d1 = (x + y) % PERIOD; // along one diagonal
+  const d2 = (((x - y) % PERIOD) + PERIOD) % PERIOD; // along the other
+  const onNet = d1 <= 1 || d2 <= 1; // 2px-thick diamond outlines
 
-  // Sparkles: mostly along gentle diagonals so the white reads as a few
-  // drifting crests, with only the odd stray fleck off them.
-  const onDiag = (x + y) % 6 < 2 || (((x - y) % 6) + 6) % 6 < 2;
-  const h = hash(x, y);
-  if ((onDiag && h > 0.78) || h > 0.965) fill = WATER_FOAM;
-  return fill;
+  if (onNet) {
+    // Keep most of the net white, but drop ~30% of it to little gaps so the
+    // lines look hand-drawn and drifting rather than perfectly ruled.
+    return hash(x, y) > 0.3 ? WATER_FOAM : WATER_DEEP;
+  }
+  const near1 = Math.min(d1, PERIOD - d1);
+  const near2 = Math.min(d2, PERIOD - d2);
+  if (near1 >= 3 && near2 >= 3) return WATER_LIGHT; // bright diamond interiors
+  return WATER_BASE;
 }
 
 /** Merge each row into horizontal runs so the tile is a handful of rects. */

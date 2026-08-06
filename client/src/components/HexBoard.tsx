@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AxialCoord,
   BUILD_COSTS,
@@ -409,6 +409,11 @@ export function HexBoard({
           briberyBeneficiary={state.players.find((p) => p.id === state.briberyBeneficiaryId)?.name ?? "den Spieler"}
           onInspect={inspect}
         />
+        <RobberBubble
+          coord={state.tiles.find((t) => t.revealed && t.hasClassicRobber)?.coord ?? null}
+          scale={view.scale}
+          onInspect={inspect}
+        />
       </g>
     </svg>
     <button className="recenter-btn" onClick={recenter} title="Karte zentrieren" aria-label="Karte zentrieren">
@@ -550,7 +555,8 @@ function MarkerLayer({
     <g pointerEvents={onInspect ? "auto" : "none"}>
       {tiles.map((tile) => {
         const marks: { key: MarkerKind; title: string }[] = [];
-        if (tile.revealed && tile.hasClassicRobber) marks.push({ key: "robber", title: "Klassischer Räuber" });
+        // The classic robber is drawn separately (RobberBubble) so it can glide
+        // between tiles instead of snapping; boost/bribery stay per-tile here.
         if (tile.revealed && tile.hasBoostToken) marks.push({ key: "boost", title: "Boost-Figur" });
         if (briberyCoord && axialKey(briberyCoord) === axialKey(tile.coord)) marks.push({ key: "bribery", title: "Bestochen" });
         if (marks.length === 0) return null;
@@ -601,6 +607,76 @@ function MarkerLayer({
           );
         });
       })}
+    </g>
+  );
+}
+
+/**
+ * The classic robber, drawn as one persistent bubble so it slides from its old
+ * tile to its new one when a 7 moves it, instead of vanishing and reappearing.
+ * An outer group holds the target tile position (an attribute, so it never
+ * animates on pan/zoom); an inner group carries a one-shot Web-Animations glide
+ * offset that only runs when the robber's tile actually changes.
+ */
+function RobberBubble({
+  coord,
+  scale,
+  onInspect,
+}: {
+  coord: AxialCoord | null;
+  scale: number;
+  onInspect?: (info: MapInfo) => void;
+}) {
+  const innerRef = useRef<SVGGElement | null>(null);
+  const prev = useRef<{ key: string; x: number; y: number } | null>(null);
+  const center = coord ? axialToPixel(coord, scale) : null;
+  const key = coord ? axialKey(coord) : null;
+
+  useEffect(() => {
+    if (!center || !key) {
+      prev.current = null;
+      return;
+    }
+    const p = prev.current;
+    prev.current = { key, x: center.x, y: center.y };
+    if (p && p.key !== key && innerRef.current) {
+      const dx = p.x - center.x;
+      const dy = p.y - center.y;
+      innerRef.current.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0px, 0px)" }],
+        { duration: 480, easing: "cubic-bezier(.34,1.1,.5,1)" },
+      );
+    }
+  }, [key, center?.x, center?.y]);
+
+  if (!center) return null;
+  const tone = MARKER_TONES.robber;
+  const w = scale * 0.56;
+  const h = scale * 0.46;
+  const bottom = -scale * 0.44; // local coords: bubble body sits above the tile
+  const tipY = -scale * 0.2; // and the tail points down into it
+  return (
+    <g style={{ transform: `translate(${center.x}px, ${center.y}px)` }}>
+      <g
+        ref={innerRef}
+        className={`map-bubble ${onInspect ? "inspectable" : ""}`}
+        onClick={(e) => {
+          if (!onInspect) return;
+          e.stopPropagation();
+          onInspect(MARKER_INFO.robber);
+        }}
+      >
+        <title>Klassischer Räuber</title>
+        <path
+          d={`M ${-w * 0.18} ${bottom - 1} L ${w * 0.18} ${bottom - 1} L 0 ${tipY} Z`}
+          fill={tone.bg}
+          stroke={tone.border}
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+        />
+        <rect x={-w / 2} y={bottom - h} width={w} height={h} rx={h * 0.34} fill={tone.bg} stroke={tone.border} strokeWidth={1.5} />
+        <MarkerSpriteAt kind="robber" x={0} y={bottom - h / 2} size={h * 0.72} />
+      </g>
     </g>
   );
 }

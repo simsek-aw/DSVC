@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, bestBankRatio } from "@canos/shared";
+import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, SCOUT_COST, bestBankRatio } from "@canos/shared";
 import { HexBoard, BuildMode } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
@@ -208,6 +208,9 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           {state.phase === "ended" && <span>{state.players.find((p) => p.id === state.winnerId)?.name} hat gewonnen! 🏆</span>}
         </div>
         {buildMode === "knight" && <div className="mode-hint">Wähle ein Feld für den Ritter-Räuber</div>}
+        {buildMode === "scout" && (
+          <div className="mode-hint">Wähle ein verdecktes Nachbarfeld — nur du siehst, was dort liegt</div>
+        )}
         {buildMode === "bribery" && <div className="mode-hint">Wähle ein aufgedecktes Feld für die Bestechung</div>}
         {buildMode === "roadBuilding" && (
           <div className="mode-hint">
@@ -293,6 +296,14 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
               resources={me?.resources}
               active={false}
               onClick={() => setConfirmingBuyCard(true)}
+            />
+            <BuildTile
+              icon="🔭"
+              label="Spähen"
+              cost={SCOUT_COST}
+              resources={me?.resources}
+              active={buildMode === "scout"}
+              onClick={() => setBuildMode(buildMode === "scout" ? null : "scout")}
             />
           </div>
         )}

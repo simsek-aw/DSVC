@@ -14,6 +14,8 @@ mit verdeckten Feldern, einer prozeduralen Insel und drei Räuber-Varianten.
   Spielerzahl (19–30 Felder), bleibt aber immer überschaubar.
 - **Verdeckte Häfen**: Auch Handelshäfen werden erst beim Aufdecken ihres Feldes sichtbar.
 - **Drei Räuber-Varianten** (siehe unten) statt nur des klassischen Räubers.
+- **Erkundung & Funde**: verdeckte Felder lassen sich heimlich auskundschaften, und unter
+  einigen liegt ein einmaliger Schatz (siehe unten).
 - **Asynchrones Langzeitspiel**: Der Server persistiert jeden Raum-Zustand; Spieler können
   jederzeit offline gehen, das Spiel wartet einfach auf ihren Zug. Sind alle online, geht
   es ohne Verzögerung normal weiter — es gibt keinen Zugzeit-Timer, der jemanden zwingt.
@@ -44,12 +46,28 @@ mit verdeckten Feldern, einer prozeduralen Insel und drei Räuber-Varianten.
    Opfer darf so lange **mischen**, bis wirklich gezogen wurde. Die Ritterkarte löst denselben
    Ablauf aus.
 
+## Erkundung & Funde
+
+- **Spähtrupp** 🔭 — für 1 Wolle deckst du ein verdecktes Feld auf, das an eines deiner
+  eigenen Felder grenzt. Es bleibt offiziell verdeckt und **nur du** siehst, was dort liegt
+  (gestrichelter Rahmen, abgedunkeltes Terrain). Im Log erfahren die anderen nur, *dass*
+  jemand gespäht hat — nicht was er gefunden hat. Damit wird Wissen selbst zu etwas, das
+  man am Verhandlungstisch verkaufen kann.
+- **Ruinen & Schätze** — unter ein paar verdeckten Feldern liegt ein einmaliger Fund, der
+  ausgelöst wird, sobald eine Siedlung das Feld zum ersten Mal aufdeckt: ein **Versteck** 📦
+  (2 Rohstoffe der Feldsorte), ein **Relikt** 🏺 (eine Entwicklungskarte) oder eine
+  **verfluchte Ruine** 💀 (kostet 2 Rohstoffe). Belohnt das Expandieren ins Unbekannte.
+
+Beides läuft über eine serverseitige Sichtfilterung: verdeckte Felder verlassen den Server
+gar nicht erst mit Terrain, Zahl, Hafen oder Fund — vorher lag die komplette Karte in jedem
+Client. (Im Demo-Modus entfällt die Filterung, weil dort ein Gerät alle Spieler steuert.)
+
 ## Entwicklungskarten
 
 Gekauft für 1 Erz + 1 Weizen + 1 Wolle, gespielt aus der eigenen (verdeckten) Hand:
 
-- **Ritter** ⚔️ — bewegt den klassischen Räuber sofort (auch ohne 7) und stiehlt eine
-  zufällige Rohstoffkarte von einem Gegner am neuen Räuberfeld. Wer die meisten Ritter
+- **Ritter** ⚔️ — bewegt den klassischen Räuber sofort (auch ohne 7) und löst denselben
+  Raubzug aus wie eine 7 (Opferwahl + Karte aus dem Fächer ziehen). Wer die meisten Ritter
   spielt (mind. 3), erhält die **Größte Rittermacht** (+2 Siegpunkte).
 - **Straßenbau** 🛤️ — baut sofort 2 kostenlose Straßen.
 - **Erfindung** 💡 — nimmt sich 2 beliebige Rohstoffe aus der Bank.

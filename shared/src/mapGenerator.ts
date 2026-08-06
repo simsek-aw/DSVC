@@ -137,8 +137,17 @@ export function generateMap(options: MapGenOptions): GeneratedMap {
       hasClassicRobber: terrain === "desert",
       hasBoostToken: false,
       port: null,
+      scoutedBy: [],
+      treasure: null,
     };
   });
+
+  // Scatter a few one-off finds under hidden tiles: worth exploring toward.
+  const treasureKinds: ("cache" | "relic" | "curse")[] = ["cache", "cache", "relic", "curse"];
+  const treasureCandidates = shuffle(tiles.filter((t) => t.terrain !== "desert"));
+  for (let i = 0; i < Math.min(treasureKinds.length, treasureCandidates.length); i++) {
+    treasureCandidates[i].treasure = treasureKinds[i];
+  }
 
   // Place the classic robber on the desert if present, otherwise a random tile.
   if (!tiles.some((t) => t.hasClassicRobber)) {

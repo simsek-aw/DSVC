@@ -1,5 +1,5 @@
 import { buildBoardGraph, tilesTouchingVertex, vertexNeighborsOf } from "./boardGraph";
-import { AxialCoord, EdgeId, axialKey, edgeKey, vertexKey } from "./hexGrid";
+import { AxialCoord, EdgeId, axialKey, axialNeighbors, edgeKey, vertexKey } from "./hexGrid";
 import { longestRoadLength } from "./longestRoad";
 import { generateMap } from "./mapGenerator";
 import {
@@ -18,6 +18,7 @@ import {
   HAND_LIMIT_ON_SEVEN,
   RESOURCE_TYPES,
   Road,
+  SCOUT_COST,
   TERRAIN_NAMES_DE,
   Tile,
   VICTORY_POINTS_TO_WIN,
@@ -158,13 +159,89 @@ function updatePlayer(state: GameState, playerId: string, fn: (p: Player) => Pla
   return { ...state, players: state.players.map((p) => (p.id === playerId ? fn(p) : p)) };
 }
 
-function revealTilesTouching(state: GameState, vertex: { x: number; y: number }): GameState {
+// Uncovers every tile around a freshly placed settlement and hands whoever
+// placed it any one-off find that was buried under a newly uncovered tile.
+function revealTilesTouching(state: GameState, vertex: { x: number; y: number }, finderId: string): GameState {
   const graph = buildBoardGraph(state.tiles, TILE_SIZE);
   const touching = tilesTouchingVertex(graph, vertex);
   const touchingKeys = new Set(touching.map((c) => axialKey(c)));
-  return {
+
+  const newlyRevealed = state.tiles.filter((t) => touchingKeys.has(axialKey(t.coord)) && !t.revealed);
+  let next: GameState = {
     ...state,
     tiles: state.tiles.map((t) => (touchingKeys.has(axialKey(t.coord)) ? { ...t, revealed: true } : t)),
+  };
+
+  for (const tile of newlyRevealed) {
+    if (!tile.treasure) continue;
+    next = collectTreasure(next, tile, finderId);
+  }
+  return next;
+}
+
+function collectTreasure(state: GameState, tile: Tile, finderId: string): GameState {
+  const finder = state.players.find((p) => p.id === finderId);
+  if (!finder) return state;
+  const clear = (s: GameState): GameState => ({
+    ...s,
+    tiles: s.tiles.map((t) => (axialKey(t.coord) === axialKey(tile.coord) ? { ...t, treasure: null } : t)),
+  });
+
+  if (tile.treasure === "cache") {
+    // A stash of whatever the tile itself produces.
+    const resource = (tile.terrain === "desert" ? "wheat" : tile.terrain) as ResourceType;
+    let next = updatePlayer(state, finderId, (p) => ({ ...p, resources: { ...p.resources, [resource]: p.resources[resource] + 2 } }));
+    next = { ...next, log: [...next.log, `${finder.name} findet ein Versteck: 2x ${TERRAIN_NAMES_DE[resource]}! 📦`] };
+    return clear(next);
+  }
+
+  if (tile.treasure === "relic") {
+    if (state.developmentDeck.length === 0) return clear(state);
+    const [card, ...rest] = state.developmentDeck;
+    let next = updatePlayer({ ...state, developmentDeck: rest }, finderId, (p) => ({
+      ...p,
+      developmentCards: [...p.developmentCards, card],
+    }));
+    next = { ...next, log: [...next.log, `${finder.name} birgt ein Relikt und erhält eine Entwicklungskarte! 🏺`] };
+    return clear(next);
+  }
+
+  // Curse: the ruin costs the finder a couple of cards, if they have any.
+  const owned = RESOURCE_TYPES.filter((r) => finder.resources[r] > 0);
+  let next = state;
+  for (let i = 0; i < 2 && owned.length > 0; i++) {
+    const victimRes = owned[Math.floor(Math.random() * owned.length)];
+    const holder = next.players.find((p) => p.id === finderId)!;
+    if (holder.resources[victimRes] <= 0) continue;
+    next = updatePlayer(next, finderId, (p) => ({ ...p, resources: { ...p.resources, [victimRes]: p.resources[victimRes] - 1 } }));
+  }
+  next = { ...next, log: [...next.log, `${finder.name} stört eine verfluchte Ruine und verliert Rohstoffe. 💀`] };
+  return clear(next);
+}
+
+/**
+ * The state as one player is allowed to see it: tiles they have neither
+ * uncovered nor scouted come across as blank. Without this the whole hidden
+ * map would sit in every client's memory.
+ */
+export function viewFor(state: GameState, playerId: string): GameState {
+  if (state.demoMode) return state; // one device plays every seat
+  return {
+    ...state,
+    tiles: state.tiles.map((t) => {
+      const scouted = t.scoutedBy.includes(playerId);
+      if (t.revealed) return { ...t, scoutedBy: scouted ? [playerId] : [] };
+      if (scouted) return { ...t, scoutedBy: [playerId], treasure: null };
+      return {
+        ...t,
+        terrain: "unknown" as const,
+        numberToken: null,
+        hasBoostToken: false,
+        port: null,
+        treasure: null,
+        scoutedBy: [],
+      };
+    }),
   };
 }
 
@@ -423,7 +500,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
 
       const building: Building = { vertex: action.vertex, type: "settlement", ownerId: playerId };
       let next: GameState = { ...state, buildings: [...state.buildings, building], setupStepAwaitingRoad: true };
-      next = revealTilesTouching(next, action.vertex);
+      next = revealTilesTouching(next, action.vertex, playerId);
       next = updatePlayer(next, playerId, (p) => ({ ...p, victoryPoints: p.victoryPoints + 1 }));
 
       // Second settlement of setup grants immediate starting resources (classic Catan rule).
@@ -612,7 +689,7 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
 
       let next = updatePlayer(state, playerId, (p) => payCost(p, BUILD_COSTS.settlement));
       next = { ...next, buildings: [...next.buildings, { vertex: action.vertex, type: "settlement", ownerId: playerId }] };
-      next = revealTilesTouching(next, action.vertex);
+      next = revealTilesTouching(next, action.vertex, playerId);
       next = updatePlayer(next, playerId, (p) => ({ ...p, victoryPoints: p.victoryPoints + 1 }));
       next = checkVictory(next);
       return next;
@@ -793,6 +870,39 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         // A fulfilled trade also settles whatever "I need X" call started it.
         resourceRequest: next.resourceRequest?.fromPlayerId === trade.toPlayerId ? null : next.resourceRequest,
         log: [...next.log, `${proposer.name} und ${responder.name} handeln erfolgreich.`],
+      };
+      return next;
+    }
+
+    case "scoutTile": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      const scout = state.players.find((p) => p.id === playerId);
+      if (!scout) throw new GameError("Spieler nicht gefunden.");
+      const target = findTile(state, action.coord);
+      if (target.revealed) throw new GameError("Dieses Feld ist längst aufgedeckt.");
+      if (target.scoutedBy.includes(playerId)) throw new GameError("Dieses Feld hast du schon erkundet.");
+      if (!hasEnoughResources(scout, SCOUT_COST)) throw new GameError("Für einen Spähtrupp brauchst du 1x Wolle.");
+
+      // Only reachable from your own frontier: a hidden tile next to one you
+      // already have a building on. Keeps scouting a local, earned advantage.
+      const graph = buildBoardGraph(state.tiles, TILE_SIZE);
+      const myTileKeys = new Set<string>();
+      for (const b of state.buildings) {
+        if (b.ownerId !== playerId) continue;
+        for (const c of tilesTouchingVertex(graph, b.vertex)) myTileKeys.add(axialKey(c));
+      }
+      const adjacent = axialNeighbors(target.coord).some((n) => myTileKeys.has(axialKey(n)));
+      if (!adjacent) throw new GameError("Zu weit weg — du kannst nur an deine eigenen Felder angrenzende Felder erkunden.");
+
+      let next = updatePlayer(state, playerId, (p) => payCost(p, SCOUT_COST));
+      next = {
+        ...next,
+        tiles: next.tiles.map((t) =>
+          axialKey(t.coord) === axialKey(target.coord) ? { ...t, scoutedBy: [...t.scoutedBy, playerId] } : t
+        ),
+        // Deliberately vague in the public log: the others learn that someone
+        // scouted, not what they found.
+        log: [...next.log, `${scout.name} schickt einen Spähtrupp aus. 🔭`],
       };
       return next;
     }

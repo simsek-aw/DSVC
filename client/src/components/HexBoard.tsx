@@ -15,7 +15,7 @@ import {
   vertexKey,
 } from "@canos/shared";
 
-export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding";
+export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout";
 
 interface Props {
   state: GameState;
@@ -33,6 +33,7 @@ const TERRAIN_COLORS: Record<string, string> = {
   wheat: "#e9c46a",
   sheep: "#a7c957",
   desert: "#d4a373",
+  unknown: "#1b263b",
 };
 
 function tilePolygonPoints(center: { x: number; y: number }, size: number): string {
@@ -135,6 +136,8 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
       sendAction({ type: "playKnight", coord: tile.coord });
     } else if (buildMode === "bribery" && tile.revealed) {
       sendAction({ type: "playBribery", coord: tile.coord });
+    } else if (buildMode === "scout" && !tile.revealed) {
+      sendAction({ type: "scoutTile", coord: tile.coord });
     }
   };
 
@@ -150,6 +153,9 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
       onPointerCancel={endPointer}
       onWheel={onWheel}
     >
+      <WaterPattern />
+      <rect x={0} y={0} width="100%" height="100%" fill="url(#water)" />
+      <rect x={0} y={0} width="100%" height="100%" fill="url(#waterVignette)" />
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
         {state.tiles.map((tile) => {
           const center = px(tile.coord);
@@ -161,6 +167,7 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
               center={center}
               size={view.scale}
               isBribed={!!isBribed}
+              scouted={tile.scoutedBy.includes(myPlayerId)}
               onClickTile={() => handleTileClick(tile)}
             />
           );
@@ -302,6 +309,69 @@ export function HexBoard({ state, myPlayerId, buildMode, sendAction, freeRoadEdg
   );
 }
 
+// Hand-built pixel-art sea, in the spirit of classic blocky water tiles but
+// drawn from scratch (and darkened) so it sits under the board without
+// competing with the terrain colours.
+const WATER_BASE = "#12303f";
+const WATER_MID = "#1d5875";
+const WATER_LIGHT = "#2b83a1";
+const WATER_FOAM = "#57b3cc";
+
+const WATER_CELL = 4; // px per pixel-art cell
+const WATER_GRID = 26; // cells per tile edge
+
+// Rounded lumps rather than straight dashes — straight rows of pixels read as
+// brickwork, whereas clipped corners read as swells on water.
+type Blob = { x: number; y: number; w: number; h: number; c: string };
+const WATER_BLOBS: Blob[] = [
+  { x: 2, y: 2, w: 7, h: 5, c: WATER_MID },
+  { x: 15, y: 3, w: 8, h: 5, c: WATER_MID },
+  { x: 8, y: 11, w: 7, h: 5, c: WATER_MID },
+  { x: 19, y: 15, w: 5, h: 4, c: WATER_MID },
+  { x: 2, y: 17, w: 6, h: 4, c: WATER_MID },
+  { x: 11, y: 20, w: 6, h: 4, c: WATER_MID },
+  { x: 11, y: 6, w: 4, h: 3, c: WATER_LIGHT },
+  { x: 3, y: 10, w: 3, h: 2, c: WATER_LIGHT },
+  { x: 20, y: 9, w: 4, h: 3, c: WATER_LIGHT },
+  { x: 15, y: 17, w: 3, h: 2, c: WATER_LIGHT },
+  { x: 5, y: 22, w: 4, h: 2, c: WATER_LIGHT },
+];
+const WATER_FOAM_DOTS: [number, number][] = [
+  [5, 4], [18, 5], [12, 13], [21, 16], [4, 18], [14, 21], [9, 8], [23, 12],
+];
+
+// A pixel "blob": full body with the corner cells shaved off.
+function blobRects(b: Blob, key: number) {
+  const r = (x: number, y: number, w: number, h: number, i: string) => (
+    <rect key={`${key}-${i}`} x={x * WATER_CELL} y={y * WATER_CELL} width={w * WATER_CELL} height={h * WATER_CELL} fill={b.c} />
+  );
+  return [
+    r(b.x + 1, b.y, b.w - 2, 1, "t"),
+    r(b.x, b.y + 1, b.w, b.h - 2, "m"),
+    r(b.x + 1, b.y + b.h - 1, b.w - 2, 1, "b"),
+  ];
+}
+
+function WaterPattern() {
+  const size = WATER_GRID * WATER_CELL;
+  return (
+    <defs>
+      <pattern id="water" width={size} height={size} patternUnits="userSpaceOnUse">
+        <rect width={size} height={size} fill={WATER_BASE} />
+        {WATER_BLOBS.map((b, i) => blobRects(b, i))}
+        {WATER_FOAM_DOTS.map(([x, y], i) => (
+          <rect key={`f${i}`} x={x * WATER_CELL} y={y * WATER_CELL} width={WATER_CELL} height={WATER_CELL} fill={WATER_FOAM} />
+        ))}
+      </pattern>
+      {/* Darkens the edges so the island stays the focus. */}
+      <radialGradient id="waterVignette" cx="50%" cy="42%" r="72%">
+        <stop offset="0%" stopColor="#0d1b1e" stopOpacity="0" />
+        <stop offset="100%" stopColor="#0d1b1e" stopOpacity="0.72" />
+      </radialGradient>
+    </defs>
+  );
+}
+
 function scalePoint(v: VertexId, scale: number) {
   return { x: v.x * scale, y: v.y * scale };
 }
@@ -318,24 +388,48 @@ function TilePiece({
   center,
   size,
   isBribed,
+  scouted,
   onClickTile,
 }: {
   tile: Tile;
   center: { x: number; y: number };
   size: number;
   isBribed: boolean;
+  scouted: boolean;
   onClickTile: () => void;
 }) {
   const points = tilePolygonPoints(center, size * 0.97);
-  const fill = tile.revealed ? TERRAIN_COLORS[tile.terrain] : "#1b263b";
+  // A scouted tile shows its terrain only to the player who paid for the look,
+  // dimmed and dashed so it stays visibly "not officially uncovered yet".
+  const known = tile.revealed || scouted;
+  const fill = known ? TERRAIN_COLORS[tile.terrain] : "#1b263b";
 
   return (
     <g onClick={onClickTile} className="tile-group">
-      <polygon points={points} fill={fill} stroke="#0d1b1e" strokeWidth={1.5} />
-      {!tile.revealed && (
+      <polygon
+        points={points}
+        fill={fill}
+        fillOpacity={tile.revealed ? 1 : scouted ? 0.5 : 1}
+        stroke={scouted && !tile.revealed ? "#a8dadc" : "#0d1b1e"}
+        strokeWidth={1.5}
+        strokeDasharray={scouted && !tile.revealed ? "4 3" : undefined}
+      />
+      {!tile.revealed && !scouted && (
         <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="middle" className="tile-back-glyph">
           ?
         </text>
+      )}
+      {!tile.revealed && scouted && (
+        <>
+          <text x={center.x} y={center.y - size * 0.1} textAnchor="middle" dominantBaseline="middle" className="scout-glyph">
+            🔭
+          </text>
+          {tile.numberToken !== null && (
+            <text x={center.x} y={center.y + size * 0.3} textAnchor="middle" dominantBaseline="middle" className="scout-number">
+              {tile.numberToken}
+            </text>
+          )}
+        </>
       )}
       {tile.revealed && tile.numberRevealed && tile.numberToken !== null && (
         <>

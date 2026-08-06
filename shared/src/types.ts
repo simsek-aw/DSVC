@@ -1,7 +1,9 @@
 import { AxialCoord, VertexId, EdgeId } from "./hexGrid";
 
 export type ResourceType = "wood" | "brick" | "ore" | "wheat" | "sheep";
-export type TerrainType = ResourceType | "desert";
+// "unknown" only ever reaches the client: the server blanks out tiles a
+// particular player has neither uncovered nor scouted before sending state.
+export type TerrainType = ResourceType | "desert" | "unknown";
 
 export const RESOURCE_TYPES: ResourceType[] = ["wood", "brick", "ore", "wheat", "sheep"];
 
@@ -13,7 +15,11 @@ export const TERRAIN_NAMES_DE: Record<TerrainType, string> = {
   wheat: "Weizen",
   sheep: "Wolle",
   desert: "Wüsten",
+  unknown: "unbekannt",
 };
+
+// One-off find sitting under a hidden tile, triggered when it is first uncovered.
+export type TreasureType = "cache" | "relic" | "curse";
 
 export interface Tile {
   coord: AxialCoord;
@@ -24,6 +30,10 @@ export interface Tile {
   hasClassicRobber: boolean; // the original robber, moved on a roll of 7
   hasBoostToken: boolean; // fixed "wildcard" figure placed at map gen, hidden until revealed; doubles the tile's harvest forever
   port: PortInfo | null; // hidden (like the tile) until touched
+  // Players who paid to scout this tile: they see it privately, everyone else
+  // still sees the back until a settlement uncovers it for good.
+  scoutedBy: string[];
+  treasure: TreasureType | null; // cleared once collected
 }
 
 export interface PortInfo {
@@ -157,6 +167,7 @@ export const BUILD_COSTS: Record<"road" | "settlement" | "city" | "developmentCa
 };
 
 export const VICTORY_POINTS_TO_WIN = 10;
+export const SCOUT_COST: Partial<Record<ResourceType, number>> = { sheep: 1 };
 export const HAND_LIMIT_ON_SEVEN = 7; // more than this and you discard half on a 7
 export const LONGEST_ROAD_MIN_LENGTH = 5;
 export const LARGEST_ARMY_MIN_KNIGHTS = 3;
@@ -184,6 +195,7 @@ export type ClientAction =
   | { type: "bankTrade"; give: ResourceType; receive: ResourceType }
   | { type: "offerTrade"; toPlayerId: string; give: Partial<Record<ResourceType, number>>; receive: Partial<Record<ResourceType, number>> }
   | { type: "respondTrade"; accept: boolean }
+  | { type: "scoutTile"; coord: AxialCoord }
   | { type: "requestResource"; resource: ResourceType }
   | { type: "cancelResourceRequest" }
   | { type: "offerQuickTrade"; wantInReturn: ResourceType }

@@ -29,6 +29,7 @@ export type {
   DiceRoll,
   TradeOffer,
   ResourceRequest,
+  TreasureType,
   Negotiation,
   PendingSteal,
   GameState,
@@ -39,6 +40,7 @@ export {
   TERRAIN_NAMES_DE,
   BUILD_COSTS,
   VICTORY_POINTS_TO_WIN,
+  SCOUT_COST,
   HAND_LIMIT_ON_SEVEN,
   LONGEST_ROAD_MIN_LENGTH,
   LARGEST_ARMY_MIN_KNIGHTS,
@@ -64,4 +66,5 @@ export {
   totalVictoryPoints,
   bestBankRatio,
   handSize,
+  viewFor,
 } from "./gameEngine";

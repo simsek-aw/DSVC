@@ -13,6 +13,7 @@ import {
   GameState,
   removePlayer,
   setPlayerConnected,
+  viewFor,
 } from "@canos/shared";
 import { deleteRoom, getRoom, loadAllRoomsFromDisk, saveRoom } from "./roomStore";
 
@@ -38,9 +39,19 @@ loadAllRoomsFromDisk();
 const ROOM_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const generateRoomId = customAlphabet(ROOM_ID_ALPHABET, 5);
 
+// Every player gets their own view: tiles they have not uncovered or scouted
+// are blanked out server-side, so the hidden map never reaches their client.
 function broadcastState(roomId: string) {
   const state = getRoom(roomId);
-  if (state) io.to(roomId).emit("state", state);
+  if (!state) return;
+  const members = io.sockets.adapter.rooms.get(roomId);
+  if (!members) return;
+  for (const socketId of members) {
+    const member = io.sockets.sockets.get(socketId);
+    if (!member) continue;
+    const pid = (member as any).canosPlayerId as string | undefined;
+    member.emit("state", pid ? viewFor(state, pid) : state);
+  }
 }
 
 function sameName(a: string, b: string): boolean {

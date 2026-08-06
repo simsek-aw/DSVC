@@ -221,6 +221,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       </div>
 
       <div className="sidebar">
+        <div className="sidebar-scroll">
         <div className="player-cards">
           {state.players.map((p) => (
             <div key={p.id} className="player-card-wrap">
@@ -251,28 +252,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             </div>
           ))}
         </div>
-
-        {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && (
-          <div className="bottom-actions">
-            <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
-              🃏 Karten ({me?.developmentCards.length ?? 0})
-            </button>
-            <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
-              🔁 Handel
-            </button>
-            <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
-              Zug beenden
-            </button>
-            {/* Keeps this turn's roll on screen instead of the dice vanishing. */}
-            <div className="dice-result-tile" title="Dein Wurf in dieser Runde">
-              <span className="dice-result-faces">
-                {DICE_FACES[state.lastDiceRoll.die1]}
-                {DICE_FACES[state.lastDiceRoll.die2]}
-              </span>
-              <span className="dice-result-total">{state.lastDiceRoll.total}</span>
-            </div>
-          </div>
-        )}
 
         {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && !confirmingBuyCard && (
           <div className="build-bar">
@@ -418,6 +397,28 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>
         )}
 
+        <div className="log-panel">
+          <button className="log-header" onClick={() => setLogExpanded((v) => !v)}>
+            <span className="log-latest">{latestLogEntry}</span>
+            <span className="log-toggle-arrow">{logExpanded ? "▾" : "▸"}</span>
+          </button>
+          {logExpanded && (
+            <div className="log-entries">
+              {state.log
+                .slice(-30)
+                .reverse()
+                .map((entry, i) => (
+                  <div key={i} className="log-entry">
+                    {entry}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        </div>
+        {/* Bottom dock: pinned to the lower edge, its panels grow upward. */}
+        <div className="dock">
         {showCards && me && (
           <div className="card-panel">
             {me.developmentCards.length === 0 && <p className="hint">Keine Karten auf der Hand.</p>}
@@ -526,25 +527,28 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        <div className="log-panel">
-          <button className="log-header" onClick={() => setLogExpanded((v) => !v)}>
-            <span className="log-latest">{latestLogEntry}</span>
-            <span className="log-toggle-arrow">{logExpanded ? "▾" : "▸"}</span>
-          </button>
-          {logExpanded && (
-            <div className="log-entries">
-              {state.log
-                .slice(-30)
-                .reverse()
-                .map((entry, i) => (
-                  <div key={i} className="log-entry">
-                    {entry}
-                  </div>
-                ))}
+          {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && (
+            <div className="bottom-actions">
+              <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
+                🃏 Karten ({me?.developmentCards.length ?? 0})
+              </button>
+              <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
+                🔁 Handel
+              </button>
+              <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
+                Zug beenden
+              </button>
+              {/* Keeps this turn's roll on screen instead of the dice vanishing. */}
+              <div className="dice-result-tile" title="Dein Wurf in dieser Runde">
+                <span className="dice-result-faces">
+                  {DICE_FACES[state.lastDiceRoll.die1]}
+                  {DICE_FACES[state.lastDiceRoll.die2]}
+                </span>
+                <span className="dice-result-total">{state.lastDiceRoll.total}</span>
+              </div>
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

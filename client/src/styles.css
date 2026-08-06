@@ -158,7 +158,11 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
+  /* Both of these are needed so a growing sidebar shrinks the board instead of
+     pushing the whole layout past the bottom of the screen. */
+  min-height: 0;
+  overflow: hidden;
 }
 
 @media (min-width: 900px) {
@@ -169,8 +173,9 @@ body {
 
 .board-area {
   position: relative;
-  flex: 1;
-  min-height: 55vh;
+  flex: 1 1 auto;
+  /* Gives way when the sidebar needs room, but never collapses entirely. */
+  min-height: 140px;
   overflow: hidden;
 }
 
@@ -300,8 +305,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  overflow-y: auto;
+  /* The sidebar itself never scrolls: its upper part does, so the dock at the
+     bottom can never be pushed out of view. */
+  overflow: hidden;
+  min-height: 0;
   background: #10242a;
+}
+
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 @media (min-width: 900px) {
@@ -1198,4 +1215,33 @@ body {
 
 .steal-card:disabled {
   cursor: default;
+}
+
+/* Bottom dock: stays pinned to the lower edge of the sidebar, and anything
+   opened from its buttons (cards, trade) grows upward above them. */
+.dock {
+  /* Shrinkable: when an opened panel makes the dock taller than the sidebar,
+     the dock gives way and its panel scrolls, instead of the whole dock being
+     pushed off the bottom edge. */
+  flex: 0 1 auto;
+  min-height: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #10242a;
+  padding-top: 6px;
+  box-shadow: 0 -8px 12px -8px rgba(0, 0, 0, 0.7);
+}
+
+.dock .card-panel,
+.dock .trade-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The buttons themselves must never shrink or scroll away. */
+.dock .bottom-actions {
+  flex: 0 0 auto;
 }

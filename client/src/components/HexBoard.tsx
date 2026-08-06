@@ -65,6 +65,12 @@ const FLAT_SHALLOW = "#6fdbec";
 const FLAT_SEA_TOP = "#46d2e3";
 const FLAT_SEA_BOTTOM = "#158fa8";
 
+// A simple zig-zag ("Zacken") motif, used at low opacity so flat sea and land
+// still carry a bit of hand-drawn texture. Two staggered rows per tile.
+const ZACKEN_W = 16;
+const ZACKEN_H = 16;
+const ZACKEN_PATH = ["M0 4 L4 1 L8 4 L12 1 L16 4", "M0 12 L4 9 L8 12 L12 9 L16 12"];
+
 function tilePolygonPoints(center: { x: number; y: number }, size: number): string {
   return hexCorners(center, size)
     .map((c) => `${c.x},${c.y}`)
@@ -244,6 +250,7 @@ export function HexBoard({
         centerY={(svgRef.current?.clientHeight ?? 400) / 2}
       />
       <rect x={0} y={0} width="100%" height="100%" fill={FLAT ? "url(#seaGradient)" : "url(#water)"} />
+      {FLAT && <rect x={0} y={0} width="100%" height="100%" fill="url(#seaZacken)" />}
       <rect x={0} y={0} width="100%" height="100%" fill="url(#waterVignette)" />
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
         <CoastLayer tiles={state.tiles} scale={view.scale} />
@@ -299,6 +306,20 @@ export function HexBoard({
               strokeWidth={Math.max(3, view.scale * 0.08)}
               strokeDasharray="4 4"
               strokeLinecap="round"
+            />
+          );
+        })}
+
+        {/* Roads first, so a settlement/city always sits on top of its roads. */}
+        {state.roads.map((road) => {
+          const owner = state.players.find((p) => p.id === road.ownerId);
+          return (
+            <RoadPlanks
+              key={edgeKey(road.edge)}
+              a={scalePoint(road.edge.a, view.scale)}
+              b={scalePoint(road.edge.b, view.scale)}
+              size={view.scale}
+              color={owner?.color ?? "#fff"}
             />
           );
         })}
@@ -380,19 +401,6 @@ export function HexBoard({
               />
             );
           })}
-
-        {state.roads.map((road) => {
-          const owner = state.players.find((p) => p.id === road.ownerId);
-          return (
-            <RoadPlanks
-              key={edgeKey(road.edge)}
-              a={scalePoint(road.edge.a, view.scale)}
-              b={scalePoint(road.edge.b, view.scale)}
-              size={view.scale}
-              color={owner?.color ?? "#fff"}
-            />
-          );
-        })}
 
         <MarkerLayer
           tiles={state.tiles}
@@ -668,11 +676,25 @@ function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: nu
   return (
     <defs>
       {FLAT ? (
-        // A clean top-to-bottom sea gradient — no pixel noise.
-        <linearGradient id="seaGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={FLAT_SEA_TOP} />
-          <stop offset="100%" stopColor={FLAT_SEA_BOTTOM} />
-        </linearGradient>
+        <>
+          {/* A clean top-to-bottom sea gradient — no pixel noise. */}
+          <linearGradient id="seaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={FLAT_SEA_TOP} />
+            <stop offset="100%" stopColor={FLAT_SEA_BOTTOM} />
+          </linearGradient>
+          {/* Sparse zig-zag "wave" rows over the sea, drifting with the map. */}
+          <pattern id="seaZacken" width={ZACKEN_W} height={ZACKEN_H} patternUnits="userSpaceOnUse" patternTransform={transform}>
+            {ZACKEN_PATH.map((d, i) => (
+              <path key={i} d={d} fill="none" stroke="#bff0f7" strokeWidth={1.1} strokeLinecap="round" opacity={0.5} />
+            ))}
+          </pattern>
+          {/* A light zig-zag hatch to give each land tile a hint of texture. */}
+          <pattern id="zacken" width={ZACKEN_W} height={ZACKEN_H} patternUnits="userSpaceOnUse" patternTransform={`scale(${view.scale / 48})`}>
+            {ZACKEN_PATH.map((d, i) => (
+              <path key={i} d={d} fill="none" stroke="#ffffff" strokeWidth={1} strokeLinecap="round" />
+            ))}
+          </pattern>
+        </>
       ) : (
         <>
           <WaterPatternTile id="water" transform={transform} />
@@ -818,6 +840,10 @@ function TilePiece({
         strokeWidth={1.5}
         strokeDasharray={scouted && !tile.revealed ? "4 3" : undefined}
       />
+      {/* A faint zig-zag hatch gives the flat tile a bit of texture. */}
+      {FLAT && known && (
+        <polygon points={points} fill="url(#zacken)" opacity={0.1} pointerEvents="none" />
+      )}
       {harvesting && (
         <polygon key={harvestKey} className="harvest-pulse" points={points} pointerEvents="none" />
       )}

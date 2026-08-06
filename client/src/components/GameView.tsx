@@ -727,18 +727,24 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
               onClick={() => setBuildMode(buildMode === "scout" ? null : "scout")}
             />
             {state.settings.specialBuildings &&
-              (Object.values(SPECIAL_BUILDINGS)).map((spec) => (
-                <BuildTile
-                  key={spec.id}
-                  icon={spec.icon}
-                  label={spec.title}
-                  cost={spec.cost}
-                  resources={me?.resources}
-                  active={false}
-                  built={me?.specialBuildings.includes(spec.id as SpecialBuildingId) ?? false}
-                  onClick={() => sendAction({ type: "buildSpecial", building: spec.id })}
-                />
-              ))}
+              Object.values(SPECIAL_BUILDINGS).map((spec) => {
+                const isBuilt = me?.specialBuildings.includes(spec.id as SpecialBuildingId) ?? false;
+                const usedOne = (me?.specialBuildings.length ?? 0) > 0;
+                return (
+                  <BuildTile
+                    key={spec.id}
+                    icon={spec.icon}
+                    label={spec.title}
+                    title={`${spec.title} — ${spec.desc}`}
+                    cost={spec.cost}
+                    resources={me?.resources}
+                    active={false}
+                    built={isBuilt}
+                    locked={usedOne && !isBuilt}
+                    onClick={() => sendAction({ type: "buildSpecial", building: spec.id })}
+                  />
+                );
+              })}
           </div>
         )}
 
@@ -1142,6 +1148,8 @@ function BuildTile({
   active,
   onClick,
   built = false,
+  locked = false,
+  title,
 }: {
   icon: string;
   label: string;
@@ -1150,14 +1158,17 @@ function BuildTile({
   active: boolean;
   onClick: () => void;
   built?: boolean;
+  locked?: boolean;
+  title?: string;
 }) {
   const affordable = canAfford(resources, cost);
+  const tip = title ?? label;
   return (
     <button
-      className={`build-tile ${active ? "toggle-active" : ""} ${built ? "built" : ""}`}
-      disabled={built || !affordable}
+      className={`build-tile ${active ? "toggle-active" : ""} ${built ? "built" : ""} ${locked ? "locked" : ""}`}
+      disabled={built || locked || !affordable}
       onClick={onClick}
-      title={built ? `${label} — bereits gebaut` : affordable ? label : `${label} — nicht genug Rohstoffe`}
+      title={built ? `${tip} — bereits gebaut` : locked ? `${tip} — du hast schon einen Sonderbau` : affordable ? tip : `${tip} — nicht genug Rohstoffe`}
     >
       <span className="build-tile-icon">{icon}</span>
       {built ? (

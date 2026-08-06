@@ -60,6 +60,7 @@ export {
   LARGEST_ARMY_BONUS,
   SECRET_OBJECTIVES,
   SPECIAL_BUILDINGS,
+  SPECIAL_BUILDING_LIMIT,
   defaultSettings,
 } from "./types";
 

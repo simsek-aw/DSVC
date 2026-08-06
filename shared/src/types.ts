@@ -74,28 +74,43 @@ export interface Player {
   // owner ever sees it (viewFor blanks it for everyone else until the game ends);
   // when its condition is met it silently adds hidden victory points.
   objective: SecretObjectiveId | null;
-  // Special buildings this player has bought (each once, each worth +1 VP), when
-  // the room enables them. No board placement — a pure extra victory-point path.
+  // The single special building this player has bought, when the room enables
+  // them. Each player may build at most ONE, it gives no victory points — only a
+  // one-off strategic effect. No board placement.
   specialBuildings: SpecialBuildingId[];
 }
 
-// Optional off-board buildings, each buildable once per player for a flat cost
-// and worth one victory point. Deliberately effect-free: just another VP route.
-export type SpecialBuildingId = "watchtower" | "market" | "harbormaster";
+// Optional off-board buildings. Each grants an effect (not victory points), and
+// every player may build only ONE of them for the whole game — a real trade-off.
+export type SpecialBuildingId = "lighthouse" | "watchtower";
 
 export interface SpecialBuilding {
   id: SpecialBuildingId;
   title: string;
   icon: string;
   cost: Partial<Record<ResourceType, number>>;
-  vp: number;
+  desc: string;
 }
 
 export const SPECIAL_BUILDINGS: Record<SpecialBuildingId, SpecialBuilding> = {
-  watchtower: { id: "watchtower", title: "Späherturm", icon: "🗼", cost: { wood: 2, ore: 1 }, vp: 1 },
-  market: { id: "market", title: "Markthalle", icon: "🏛️", cost: { wheat: 2, ore: 1 }, vp: 1 },
-  harbormaster: { id: "harbormaster", title: "Hafenmeisterei", icon: "🚢", cost: { brick: 2, sheep: 1 }, vp: 1 },
+  lighthouse: {
+    id: "lighthouse",
+    title: "Leuchtturm",
+    icon: "🗼",
+    cost: { wood: 1, brick: 1, sheep: 1 },
+    desc: "Deine Seehandels-Rate wird dauerhaft eine Stufe besser (z. B. 4:1 → 3:1, Hafen 3:1 → 2:1).",
+  },
+  watchtower: {
+    id: "watchtower",
+    title: "Späherturm",
+    icon: "🔭",
+    cost: { wood: 1, ore: 1, sheep: 1 },
+    desc: "Deckt beim Bau alle verdeckten Felder auf, die an deine Bauwerke grenzen — nur für dich.",
+  },
 };
+
+// A player may build at most this many special buildings in a game.
+export const SPECIAL_BUILDING_LIMIT = 1;
 
 // Hidden missions. Each is checkable purely from board state so scoring is
 // deterministic, and each grants extra victory points nobody else can see coming.

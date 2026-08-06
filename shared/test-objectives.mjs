@@ -75,15 +75,16 @@ function assert(cond, msg) {
 
 console.log("objectives: all passed");
 
-// --- Special buildings: gated by the room toggle, once each, +1 VP each. ---
-import { SPECIAL_BUILDINGS } from "./dist/index.js";
+// --- Special buildings: gated by the room toggle, one per player, no VP,
+//     each with an effect (lighthouse = better bank rate). ---
+import { SPECIAL_BUILDINGS, bestBankRatio } from "./dist/index.js";
 {
   let s = createLobby("SB1");
   s = addPlayer(s, "A", "Anna");
   s = addPlayer(s, "B", "Ben");
   // disabled by default -> rejected
   let threw = false;
-  try { applyAction(s, "A", { type: "buildSpecial", building: "market" }); } catch { threw = true; }
+  try { applyAction(s, "A", { type: "buildSpecial", building: "lighthouse" }); } catch { threw = true; }
   assert(threw, "buildSpecial rejected when disabled");
 
   s = applyAction(s, "A", { type: "setRoomSettings", settings: { specialBuildings: true } });
@@ -93,16 +94,20 @@ import { SPECIAL_BUILDINGS } from "./dist/index.js";
   // force into mainGame with A on turn and plenty of resources
   s = { ...s, phase: "mainGame", currentPlayerIndex: 0, turnOrder: ["A", "B"],
     players: s.players.map((p) => (p.id === "A" ? { ...p, resources: { wood: 5, brick: 5, ore: 5, wheat: 5, sheep: 5 } } : p)) };
-  const before = totalVictoryPoints(s, "A");
-  s = applyAction(s, "A", { type: "buildSpecial", building: "market" });
-  assert(s.players.find((p) => p.id === "A").specialBuildings.includes("market"), "market recorded");
-  assert(totalVictoryPoints(s, "A") === before + 1, "special building adds +1 VP");
-  const spentOre = 5 - s.players.find((p) => p.id === "A").resources.ore;
-  assert(spentOre === (SPECIAL_BUILDINGS.market.cost.ore ?? 0), "market cost deducted");
-  // cannot build the same one twice
+
+  const rateBefore = bestBankRatio(s, "A", "wood");
+  const vpBefore = totalVictoryPoints(s, "A");
+  s = applyAction(s, "A", { type: "buildSpecial", building: "lighthouse" });
+  assert(s.players.find((p) => p.id === "A").specialBuildings.includes("lighthouse"), "lighthouse recorded");
+  assert(totalVictoryPoints(s, "A") === vpBefore, "special building gives NO victory points");
+  assert(bestBankRatio(s, "A", "wood") === Math.max(2, rateBefore - 1), "lighthouse improves bank rate by one step");
+  const spentWood = 5 - s.players.find((p) => p.id === "A").resources.wood;
+  assert(spentWood === (SPECIAL_BUILDINGS.lighthouse.cost.wood ?? 0), "lighthouse cost deducted");
+
+  // limit 1: cannot build the other one afterwards
   let threw2 = false;
-  try { applyAction(s, "A", { type: "buildSpecial", building: "market" }); } catch { threw2 = true; }
-  assert(threw2, "same special building rejected twice");
+  try { applyAction(s, "A", { type: "buildSpecial", building: "watchtower" }); } catch { threw2 = true; }
+  assert(threw2, "second special building rejected (limit 1)");
 }
 
 console.log("special buildings: all passed");

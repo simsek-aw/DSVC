@@ -81,8 +81,8 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
             onChange={(e) => sendAction({ type: "setRoomSettings", settings: { specialBuildings: e.target.checked } })}
           />
           <span className="room-toggle-text">
-            <strong>🏛️ Sonderbauten</strong>
-            <span className="hint">Späherturm, Markthalle & Hafenmeisterei — je einmal baubar, je +1 Siegpunkt.</span>
+            <strong>🗼 Sonderbauten</strong>
+            <span className="hint">Leuchtturm oder Späherturm — mit Effekt, aber nur EINER pro Spieler und keine Siegpunkte.</span>
           </span>
         </label>
       </div>

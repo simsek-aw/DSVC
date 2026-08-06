@@ -34,6 +34,7 @@ import {
   SECRET_OBJECTIVES,
   SpecialBuildingId,
   SPECIAL_BUILDINGS,
+  SPECIAL_BUILDING_LIMIT,
   defaultSettings,
 } from "./types";
 
@@ -427,7 +428,7 @@ export function totalVictoryPoints(state: GameState, playerId: string): number {
   if (state.longestRoadPlayerId === playerId) total += LONGEST_ROAD_BONUS;
   if (state.largestArmyPlayerId === playerId) total += LARGEST_ARMY_BONUS;
   if (player.objective && objectiveComplete(state, playerId)) total += SECRET_OBJECTIVES[player.objective].bonus;
-  for (const sb of player.specialBuildings) total += SPECIAL_BUILDINGS[sb].vp;
+  // Special buildings give effects, not victory points, so they don't count here.
   return total;
 }
 
@@ -536,6 +537,9 @@ export function bestBankRatio(state: GameState, playerId: string, resource: Reso
   }
   // A trade fair makes the bank one cheaper across the board (never below 2:1).
   if (state.weather?.kind === "fair") best = Math.max(2, best - 1);
+  // A lighthouse permanently improves this player's maritime trade by one step.
+  const owner = state.players.find((p) => p.id === playerId);
+  if (owner?.specialBuildings.includes("lighthouse")) best = Math.max(2, best - 1);
   return best;
 }
 
@@ -1305,16 +1309,35 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       if (!player) throw new GameError("Spieler nicht gefunden.");
       const spec = SPECIAL_BUILDINGS[action.building];
       if (!spec) throw new GameError("Unbekannter Sonderbau.");
-      if (player.specialBuildings.includes(action.building))
-        throw new GameError(`${spec.title} hast du bereits gebaut.`);
+      if (player.specialBuildings.length >= SPECIAL_BUILDING_LIMIT)
+        throw new GameError("Du darfst nur einen Sonderbau bauen.");
       if (!hasEnoughResources(player, spec.cost)) throw new GameError(`Nicht genug Rohstoffe für ${spec.title}.`);
+
+      let tiles = state.tiles;
+      if (action.building === "watchtower") {
+        // Reveal (privately scout) every hidden tile adjacent to my buildings.
+        const graph = buildBoardGraph(state.tiles, TILE_SIZE);
+        const myTileKeys = new Set<string>();
+        for (const b of state.buildings) {
+          if (b.ownerId !== playerId) continue;
+          for (const c of tilesTouchingVertex(graph, b.vertex)) myTileKeys.add(axialKey(c));
+        }
+        tiles = state.tiles.map((t) =>
+          !t.revealed && myTileKeys.has(axialKey(t.coord)) && !t.scoutedBy.includes(playerId)
+            ? { ...t, scoutedBy: [...t.scoutedBy, playerId] }
+            : t
+        );
+      }
+
       const players = state.players.map((p) =>
-        p.id === playerId
-          ? { ...payCost(p, spec.cost), specialBuildings: [...p.specialBuildings, action.building] }
-          : p
+        p.id === playerId ? { ...payCost(p, spec.cost), specialBuildings: [...p.specialBuildings, action.building] } : p
       );
-      const next = { ...state, players, log: [...state.log, `${spec.icon} ${player.name} baut ${spec.title} (+1 Siegpunkt).`] };
-      return checkVictory(next);
+      return {
+        ...state,
+        tiles,
+        players,
+        log: [...state.log, `${spec.icon} ${player.name} baut ${spec.title}.`],
+      };
     }
 
     default:

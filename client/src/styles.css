@@ -502,6 +502,10 @@ body {
 .build-tile.built:disabled {
   opacity: 0.6;
 }
+/* The other special building, locked out once you've built your one. */
+.build-tile.locked:disabled {
+  opacity: 0.28;
+}
 .build-tile-cost.built-tag {
   color: #7ed957;
   font-weight: 700;

@@ -216,7 +216,7 @@ body {
   height: 100%;
   touch-action: none;
   /* The sea itself is drawn as an SVG pattern inside the board. */
-  background: #3878d0;
+  background: #18bdd6;
 }
 
 .tile-group {

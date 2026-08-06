@@ -121,6 +121,44 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const lastRollKeyRef = useRef<string>("");
   const prevPlayerIndexRef = useRef<number | null>(null);
   const prevResourcesRef = useRef(me?.resources);
+  const notifiedRef = useRef(false);
+
+  // "It's your turn" reminder for the long-game / async case: when the turn
+  // becomes mine while the tab is in the background, flash the tab title and —
+  // if the player granted it — fire a browser notification. No server or push
+  // subscription needed, so it survives the free-tier host resetting.
+  const myTurnActive = isMyTurn && (state.phase === "mainGame" || state.phase === "setup");
+  useEffect(() => {
+    if (!myTurnActive) {
+      notifiedRef.current = false;
+      return;
+    }
+    if (notifiedRef.current) return;
+    notifiedRef.current = true;
+    if (typeof document !== "undefined" && document.hidden) {
+      document.title = "▶ Du bist dran!";
+      if ("Notification" in window && Notification.permission === "granted") {
+        try {
+          new Notification("Canos Incognita", { body: "Du bist am Zug!", tag: "canos-turn" });
+        } catch {
+          /* some browsers only allow notifications from a service worker; ignore */
+        }
+      }
+    }
+  }, [myTurnActive]);
+
+  // Put the title back the moment the player looks at the tab again.
+  useEffect(() => {
+    const restore = () => {
+      if (!document.hidden) document.title = "Canos Incognita";
+    };
+    document.addEventListener("visibilitychange", restore);
+    window.addEventListener("focus", restore);
+    return () => {
+      document.removeEventListener("visibilitychange", restore);
+      window.removeEventListener("focus", restore);
+    };
+  }, []);
 
   // Announce a fresh dice roll for whoever's turn it is — keyed by the roll's
   // own values (not object identity, since every broadcast recreates the
@@ -235,6 +273,16 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </button>
           {menuOpen && (
             <div className="hamburger-dropdown">
+              {"Notification" in window && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    Notification.requestPermission();
+                  }}
+                >
+                  🔔 „Du bist dran"-Erinnerung
+                </button>
+              )}
               <button
                 onClick={() => {
                   setMenuOpen(false);

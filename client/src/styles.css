@@ -287,6 +287,65 @@ body {
   max-width: calc(100% - 116px);
 }
 
+/* Turn-order strip: floats just under the "Am Zug" banner and shows the whole
+   snake sequence at a glance, current player filled, you get a subtle ring. */
+.turn-order-strip {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 24px);
+  padding: 4px 6px;
+  background: rgba(13, 27, 30, 0.7);
+  border-radius: 999px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.turn-order-strip::-webkit-scrollbar {
+  display: none;
+}
+.turn-order-seg {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.turn-order-arrow {
+  color: #6b8a8f;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.turn-order-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  color: #cdeef0;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.7;
+}
+.turn-order-chip.current {
+  opacity: 1;
+  color: #0d1b1e;
+  font-weight: 700;
+}
+.turn-order-chip.me .turn-order-name {
+  text-decoration: underline;
+}
+.turn-order-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
 .room-code-corner {
   position: absolute;
   top: 10px;

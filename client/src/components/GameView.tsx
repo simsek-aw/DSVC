@@ -504,6 +504,28 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           {state.phase === "mainGame" && <span>Am Zug: {currentPlayer?.name}</span>}
           {state.phase === "ended" && <span>{state.players.find((p) => p.id === state.winnerId)?.name} hat gewonnen! 🏆</span>}
         </div>
+        {(state.phase === "mainGame" || state.phase === "setup") && state.turnOrder.length > 0 && (
+          <div className="turn-order-strip" title="Zugreihenfolge">
+            {state.turnOrder.map((pid, i) => {
+              const p = state.players.find((pl) => pl.id === pid);
+              if (!p) return null;
+              const isCurrent = i === state.currentPlayerIndex;
+              return (
+                <div key={pid} className="turn-order-seg">
+                  {i > 0 && <span className="turn-order-arrow">›</span>}
+                  <span
+                    className={`turn-order-chip ${isCurrent ? "current" : ""} ${pid === myPlayerId ? "me" : ""}`}
+                    style={{ borderColor: p.color, background: isCurrent ? p.color : undefined }}
+                    title={p.name}
+                  >
+                    <span className="turn-order-dot" style={{ background: p.color }} />
+                    <span className="turn-order-name">{p.name}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {state.weather && (
           <button
             className="weather-banner"

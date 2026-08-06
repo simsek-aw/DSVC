@@ -49,6 +49,68 @@ function growBlob(count: number): AxialCoord[] {
   return Array.from(placed.values());
 }
 
+function landNeighbors(coord: AxialCoord, set: Set<string>): AxialCoord[] {
+  return axialNeighbors(coord).filter((n) => set.has(axialKey(n)));
+}
+
+// Articulation points of the hex adjacency graph: hexes whose removal would
+// split the island. A one-hex-wide neck is exactly such a point.
+function articulationPoints(list: AxialCoord[], set: Set<string>): AxialCoord[] {
+  const id = new Map<string, number>();
+  list.forEach((c, i) => id.set(axialKey(c), i));
+  const n = list.length;
+  const disc = new Array(n).fill(-1);
+  const low = new Array(n).fill(0);
+  const isAP = new Array(n).fill(false);
+  let timer = 0;
+  const dfs = (u: number, parent: number) => {
+    disc[u] = low[u] = timer++;
+    let children = 0;
+    for (const nb of landNeighbors(list[u], set)) {
+      const v = id.get(axialKey(nb))!;
+      if (disc[v] === -1) {
+        children++;
+        dfs(v, u);
+        low[u] = Math.min(low[u], low[v]);
+        if (parent !== -1 && low[v] >= disc[u]) isAP[u] = true;
+      } else if (v !== parent) {
+        low[u] = Math.min(low[u], disc[v]);
+      }
+    }
+    if (parent === -1 && children > 1) isAP[u] = true;
+  };
+  for (let i = 0; i < n; i++) if (disc[i] === -1) dfs(i, -1);
+  return list.filter((_, i) => isAP[i]);
+}
+
+// Widens one-hex necks so the island is at least two hexes thick everywhere:
+// nobody can be walled off by a single blocking settlement on a procedural map.
+// Keeps the lobed silhouette — it only fills notches next to a neck.
+function thickenNecks(coords: AxialCoord[], maxTiles: number): AxialCoord[] {
+  const set = new Set(coords.map(axialKey));
+  const list = [...coords];
+  for (let iter = 0; iter < 24 && list.length < maxTiles; iter++) {
+    const aps = articulationPoints(list, set);
+    if (aps.length === 0) break;
+    let added = false;
+    for (const ap of aps) {
+      const empties = axialNeighbors(ap).filter((n) => !set.has(axialKey(n)));
+      // Prefer the empty neighbour that touches the most existing land — that
+      // fills the notch beside the neck rather than growing a new spike.
+      empties.sort((a, b) => landNeighbors(b, set).length - landNeighbors(a, set).length);
+      const best = empties.find((c) => landNeighbors(c, set).length >= 2) ?? empties[0];
+      if (best && !set.has(axialKey(best))) {
+        set.add(axialKey(best));
+        list.push(best);
+        added = true;
+        break;
+      }
+    }
+    if (!added) break;
+  }
+  return list;
+}
+
 function terrainPool(count: number): ("wood" | "brick" | "ore" | "wheat" | "sheep" | "desert")[] {
   // Ratios modeled on the classic 19-tile board (4/3/3/4/4/1), scaled to `count`.
   const base: [string, number][] = [
@@ -119,7 +181,9 @@ export function generateMap(options: MapGenOptions): GeneratedMap {
   // Never too big: base 19 (4p classic), + a few tiles per extra player, capped.
   const tileCount = Math.min(19 + Math.max(0, playerCount - 4) * 5, 30);
 
-  const coords = growBlob(tileCount);
+  // Grow a lobed island, then widen any one-hex necks so no player can be
+  // sealed off by a single blocking build on a procedurally unlucky map.
+  const coords = thickenNecks(growBlob(tileCount), 30);
   const terrains = terrainPool(coords.length);
   const landCoordsForNumbers = terrains.filter((t) => t !== "desert").length;
   const numbers = numberTokenPool(landCoordsForNumbers);

@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { BUILD_COSTS, DevelopmentCardType, EdgeId, GameState, ResourceType, RESOURCE_TYPES, SCOUT_COST, bestBankRatio } from "@canos/shared";
+import {
+  BUILD_COSTS,
+  CHAT_MAX_LENGTH,
+  CHAT_PREFIX,
+  DevelopmentCardType,
+  EdgeId,
+  GameState,
+  ResourceType,
+  RESOURCE_TYPES,
+  SCOUT_COST,
+  bestBankRatio,
+} from "@canos/shared";
 import { HexBoard, BuildMode, MapInfo } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
@@ -53,6 +64,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [confirmingBuyCard, setConfirmingBuyCard] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logExpanded, setLogExpanded] = useState(false);
+  const [chatDraft, setChatDraft] = useState("");
   const [playerMenuId, setPlayerMenuId] = useState<string | null>(null);
 
   const me = state.players.find((p) => p.id === myPlayerId);
@@ -433,6 +445,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>
         )}
 
+        {/* Log and chat are one stream: messages land where players already
+            look for events, and the input sits right underneath. */}
         <div className="log-panel">
           <button className="log-header" onClick={() => setLogExpanded((v) => !v)}>
             <span className="log-latest">{latestLogEntry}</span>
@@ -441,15 +455,37 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           {logExpanded && (
             <div className="log-entries">
               {state.log
-                .slice(-30)
+                .slice(-40)
                 .reverse()
                 .map((entry, i) => (
-                  <div key={i} className="log-entry">
+                  <div key={i} className={`log-entry ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>
                     {entry}
                   </div>
                 ))}
             </div>
           )}
+          <form
+            className="chat-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const text = chatDraft.trim();
+              if (!text) return;
+              sendAction({ type: "sendChat", text });
+              setChatDraft("");
+              setLogExpanded(true);
+            }}
+          >
+            <input
+              className="chat-input"
+              placeholder="Nachricht an alle …"
+              value={chatDraft}
+              maxLength={CHAT_MAX_LENGTH}
+              onChange={(e) => setChatDraft(e.target.value)}
+            />
+            <button className="chat-send" type="submit" disabled={!chatDraft.trim()} aria-label="Senden">
+              ➤
+            </button>
+          </form>
         </div>
 
         </div>

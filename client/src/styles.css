@@ -57,7 +57,25 @@ body {
 }
 
 /* Lobby */
+/* Full-bleed pixel sea behind the start screen. */
+.water-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  shape-rendering: crispEdges;
+}
+
+.pixel-title {
+  display: block;
+  width: min(340px, 82vw);
+  margin: 0 auto 4px;
+  filter: drop-shadow(0 6px 0 rgba(13, 27, 30, 0.35));
+}
+
 .lobby-screen {
+  position: relative;
   margin: auto;
   display: flex;
   flex-direction: column;
@@ -76,6 +94,13 @@ body {
 .subtitle {
   color: #a8dadc;
   margin: 0 0 12px;
+}
+
+/* On the water the plain text needs a backing to stay readable. */
+.lobby-screen .subtitle,
+.lobby-screen .hint,
+.lobby-screen .divider {
+  text-shadow: 0 1px 3px #0d1b1e, 0 0 6px #0d1b1e;
 }
 
 .room-code {
@@ -1358,4 +1383,44 @@ body {
   font-size: 0.8rem;
   line-height: 1.35;
   color: #a8dadc;
+}
+
+/* Chat lives at the bottom of the log panel — same stream, own input. */
+.chat-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid #1d3a3f;
+}
+
+.chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #2a4a4f;
+  background: #0f2226;
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+.chat-send {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: none;
+  background: #2a9d8f;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.chat-send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.log-entry.chat {
+  color: #f1faee;
+  font-weight: 600;
 }

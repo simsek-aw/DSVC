@@ -5,6 +5,8 @@ import { generateMap } from "./mapGenerator";
 import {
   BUILD_COSTS,
   Building,
+  CHAT_MAX_LENGTH,
+  CHAT_PREFIX,
   ClientAction,
   DevelopmentCardType,
   DiceRoll,
@@ -462,7 +464,16 @@ export function bestBankRatio(state: GameState, playerId: string, resource: Reso
   return best;
 }
 
+// Log and chat share one stream, and a long game plus chatter would otherwise
+// grow it without end — every client gets the whole thing on every broadcast.
+const LOG_LIMIT = 200;
+
 export function applyAction(state: GameState, playerId: string, action: ClientAction): GameState {
+  const next = reduce(state, playerId, action);
+  return next.log.length > LOG_LIMIT ? { ...next, log: next.log.slice(-LOG_LIMIT) } : next;
+}
+
+function reduce(state: GameState, playerId: string, action: ClientAction): GameState {
   switch (action.type) {
     case "createRoom":
     case "joinRoom":
@@ -630,6 +641,16 @@ export function applyAction(state: GameState, playerId: string, action: ClientAc
         ...state,
         pendingSteal: { ...steal, victimId: action.victimId, hand: buildShuffledHand(victim), handCount: handSize(victim) },
       };
+    }
+
+    // Chat rides along in the log: one stream, so a message lands in the same
+    // place players already watch for "X würfelt 8".
+    case "sendChat": {
+      const player = state.players.find((p) => p.id === playerId);
+      if (!player) throw new GameError("Spieler nicht gefunden.");
+      const text = action.text.trim().slice(0, CHAT_MAX_LENGTH);
+      if (!text) throw new GameError("Leere Nachricht.");
+      return { ...state, log: [...state.log, `${CHAT_PREFIX}${player.name}: ${text}`] };
     }
 
     case "shuffleStealHand": {

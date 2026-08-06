@@ -17,6 +17,7 @@ import {
   vertexKey,
 } from "@canos/shared";
 import { MarkerKind, MarkerSpriteAt, NumberChipAt, ResourceSpriteAt, ShipSpriteAt } from "./PixelIcons";
+import { WaterPatternTile } from "./Water";
 
 export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout";
 
@@ -345,50 +346,6 @@ export function HexBoard({
   );
 }
 
-// Hand-built pixel-art sea, in the spirit of classic blocky water tiles but
-// drawn from scratch (and darkened) so it sits under the board without
-// competing with the terrain colours.
-// Water in the FireRed/LeafGreen vein: a saturated mid-blue sea crossed by
-// continuous horizontal ripple lines that step up and down in a square wave,
-// rather than the scattered speckles of the earlier games.
-const WATER_BASE = "#3878d0";
-const WATER_DEEP = "#2a5cab";
-const WATER_CREST = "#79b4ec";
-const WATER_FOAM = "#c6e4ff";
-
-const WATER_CELL = 4; // px per pixel-art cell
-const WATER_GRID = 16; // cells per tile edge
-const WAVE_STEP = 4; // cells per half period — divides the grid, so rows tile seamlessly
-
-// yTop, phase (in cells), and whether the line carries a bright highlight.
-const WAVE_ROWS: [number, number, boolean][] = [
-  [2, 0, true],
-  [9, 8, false],
-];
-
-/** One ripple line: alternating 4-cell runs stepping between two rows. */
-function rippleRects(yTop: number, phase: number, bright: boolean, key: number, cell: number) {
-  const out: JSX.Element[] = [];
-  for (let k = 0; k * WAVE_STEP < WATER_GRID; k++) {
-    const x = (k * WAVE_STEP + phase) % WATER_GRID;
-    const y = yTop + (k % 2 === 0 ? 0 : 1);
-    out.push(
-      <rect key={`${key}-${k}`} x={x * cell} y={y * cell} width={WAVE_STEP * cell} height={cell} fill={WATER_CREST} />
-    );
-    if (bright) {
-      // A shorter, brighter glint sitting on top of the run.
-      out.push(
-        <rect key={`${key}-${k}-g`} x={(x + 1) * cell} y={y * cell} width={2 * cell} height={cell / 2} fill={WATER_FOAM} />
-      );
-    }
-    // Shadow tucked just beneath the crest gives the line some body.
-    out.push(
-      <rect key={`${key}-${k}-s`} x={x * cell} y={(y + 1) * cell} width={WAVE_STEP * cell} height={cell / 2} fill={WATER_DEEP} />
-    );
-  }
-  return out;
-}
-
 // Pixel textures for the land, in the same handheld-RPG register as the sea:
 // a flat base colour with a handful of darker and lighter marks that read as
 // canopy, brickwork, rock facets, crop rows and tufts of grass.
@@ -638,14 +595,10 @@ function TerrainPatterns({ scale }: { scale: number }) {
  * island across a fixed backdrop.
  */
 function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: number; y: number }; centerX: number; centerY: number }) {
-  const size = WATER_GRID * WATER_CELL;
   const transform = `translate(${view.x + centerX}, ${view.y + centerY}) scale(${view.scale / 48})`;
   return (
     <defs>
-      <pattern id="water" width={size} height={size} patternUnits="userSpaceOnUse" patternTransform={transform}>
-        <rect width={size} height={size} fill={WATER_BASE} />
-        {WAVE_ROWS.map(([yTop, phase, bright], i) => rippleRects(yTop, phase, bright, i, WATER_CELL))}
-      </pattern>
+      <WaterPatternTile id="water" transform={transform} />
       <TerrainPatterns scale={view.scale} />
       {/* Darkens the edges so the island stays the focus. */}
       <radialGradient id="waterVignette" cx="50%" cy="42%" r="75%">

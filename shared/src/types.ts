@@ -173,6 +173,10 @@ export const BUILD_COSTS: Record<"road" | "settlement" | "city" | "developmentCa
 export const VICTORY_POINTS_TO_WIN = 10;
 export const SCOUT_COST: Partial<Record<ResourceType, number>> = { sheep: 1 };
 export const HAND_LIMIT_ON_SEVEN = 7; // more than this and you discard half on a 7
+// Chat messages live in the same log stream; this marker is what lets the UI
+// tell a player's message apart from an event the engine wrote.
+export const CHAT_PREFIX = "💬 ";
+export const CHAT_MAX_LENGTH = 160;
 export const LONGEST_ROAD_MIN_LENGTH = 5;
 export const LARGEST_ARMY_MIN_KNIGHTS = 3;
 export const LONGEST_ROAD_BONUS = 2;
@@ -205,6 +209,7 @@ export type ClientAction =
   | { type: "offerQuickTrade"; wantInReturn: ResourceType }
   | { type: "discardResources"; resources: Partial<Record<ResourceType, number>> }
   | { type: "chooseStealVictim"; victimId: string }
+  | { type: "sendChat"; text: string }
   | { type: "shuffleStealHand" }
   | { type: "reorderStealHand"; from: number; to: number }
   | { type: "stealCard"; index: number }

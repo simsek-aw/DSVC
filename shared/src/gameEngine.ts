@@ -7,6 +7,7 @@ import {
   Building,
   CHAT_MAX_LENGTH,
   CHAT_PREFIX,
+  ROUND_MARKER,
   ClientAction,
   DevelopmentCardType,
   EVENT_EVERY_ROUNDS,
@@ -388,7 +389,7 @@ function recomputeLongestRoad(state: GameState): GameState {
   return {
     ...state,
     longestRoadPlayerId: best.id,
-    log: [...state.log, `${winner?.name} übernimmt die Längste Straße (${best.len} Felder)!`],
+    log: [...state.log, `🛣️ ${winner?.name} übernimmt die Längste Straße (${best.len} Felder)!`],
   };
 }
 
@@ -410,7 +411,7 @@ function recomputeLargestArmy(state: GameState): GameState {
   return {
     ...state,
     largestArmyPlayerId: best.id,
-    log: [...state.log, `${winner?.name} übernimmt die Größte Rittermacht (${best.knightsPlayed} Ritter)!`],
+    log: [...state.log, `🏅 ${winner?.name} übernimmt die Größte Rittermacht (${best.knightsPlayed} Ritter)!`],
   };
 }
 
@@ -839,7 +840,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       next = {
         ...next,
         tiles: next.tiles.map((t) => ({ ...t, hasClassicRobber: axialKey(t.coord) === axialKey(target.coord) })),
-        log: [...next.log, `${currentPlayer(next).name} spielt einen Ritter und bewegt den Räuber.`],
+        log: [...next.log, `⚔️ ${currentPlayer(next).name} setzt einen Ritter ein und bewegt den Räuber.`],
       };
       // Same pick-a-victim-then-pick-a-card flow as the robber on a 7.
       next = beginSteal(next, findTile(next, target.coord), playerId);
@@ -859,7 +860,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
         if (!roadConnectsToOwnNetwork(next, playerId, edge)) throw new GameError("Straße muss an dein Netz anschließen.");
         next = { ...next, roads: [...next.roads, { edge, ownerId: playerId }] };
       }
-      next = { ...next, log: [...next.log, `${currentPlayer(next).name} baut zwei kostenlose Straßen.`] };
+      next = { ...next, log: [...next.log, `🛤️ ${currentPlayer(next).name} baut zwei kostenlose Straßen.`] };
       next = recomputeLongestRoad(next);
       next = checkVictory(next);
       return next;
@@ -872,7 +873,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       for (const resource of action.resources) {
         next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [resource]: p.resources[resource] + 1 } }));
       }
-      next = { ...next, log: [...next.log, `${currentPlayer(next).name} erfindet sich 2 Rohstoffe.`] };
+      next = { ...next, log: [...next.log, `💡 ${currentPlayer(next).name} erfindet sich 2 Rohstoffe.`] };
       return next;
     }
 
@@ -889,7 +890,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
         next = updatePlayer(next, other.id, (p) => ({ ...p, resources: { ...p.resources, [action.resource]: 0 } }));
       }
       next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [action.resource]: p.resources[action.resource] + total } }));
-      next = { ...next, log: [...next.log, `${currentPlayer(next).name} verhängt ein Monopol auf ${TERRAIN_NAMES_DE[action.resource]} und kassiert ${total}.`] };
+      next = { ...next, log: [...next.log, `📈 ${currentPlayer(next).name} verhängt ein Monopol auf ${TERRAIN_NAMES_DE[action.resource]} und kassiert ${total}.`] };
       return next;
     }
 
@@ -903,7 +904,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
         ...next,
         briberyTileCoord: target.coord,
         briberyBeneficiaryId: playerId,
-        log: [...next.log, `${currentPlayer(next).name} bestechen den Räuber — die Ernte eines ${TERRAIN_NAMES_DE[target.terrain]}-Felds wandert nun zu ihm.`],
+        log: [...next.log, `💰 ${currentPlayer(next).name} besticht den Räuber — die Ernte eines ${TERRAIN_NAMES_DE[target.terrain]}-Felds wandert nun zu ihm.`],
       };
       return next;
     }
@@ -1177,6 +1178,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       // A full round has passed once play wraps back to the first player.
       if (nextIndex === 0) {
         roundCount += 1;
+        log = [...log, `${ROUND_MARKER} Runde ${roundCount}`];
         if (roundCount % EVENT_EVERY_ROUNDS === 0) {
           weather = drawWeather(state);
           log = [...log, describeWeather(weather)];

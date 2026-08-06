@@ -3,6 +3,7 @@ import {
   BUILD_COSTS,
   CHAT_MAX_LENGTH,
   CHAT_PREFIX,
+  ROUND_MARKER,
   PIECE_LIMITS,
   DevelopmentCardType,
   EdgeId,
@@ -39,6 +40,9 @@ const RESOURCE_NAMES: Record<ResourceType, string> = {
   wheat: "Weizen",
   sheep: "Wolle",
 };
+
+// Leading emojis the engine puts on "big play" log lines worth a popup.
+const ANNOUNCE_EMOJIS = ["⚔️", "🏅", "🛣️", "📈", "💡", "🛤️", "💰"];
 
 const WEATHER_INFO: Record<string, { icon: string; title: string }> = {
   bounty: { icon: "☀️", title: "Reiche Ernte" },
@@ -145,6 +149,23 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const prevPlayerIndexRef = useRef<number | null>(null);
   const prevResourcesRef = useRef(me?.resources);
   const notifiedRef = useRef(false);
+  const logSeenRef = useRef(state.log.length);
+
+  // Big plays (knight, monopoly, longest road, …) get the same popup treatment
+  // as a dice roll. The engine tags those log lines with a leading emoji, so a
+  // freshly-added line starting with one of them is worth announcing to all.
+  useEffect(() => {
+    const seen = logSeenRef.current;
+    logSeenRef.current = state.log.length;
+    if (state.log.length <= seen) return;
+    const fresh = state.log.slice(seen);
+    const notable = [...fresh].reverse().find((line) => ANNOUNCE_EMOJIS.some((e) => line.startsWith(e)));
+    if (notable) {
+      setTurnPopup(notable);
+      const t = setTimeout(() => setTurnPopup(null), 2800);
+      return () => clearTimeout(t);
+    }
+  }, [state.log]);
 
   // "It's your turn" reminder for the long-game / async case: when the turn
   // becomes mine while the tab is in the background, flash the tab title and —
@@ -499,6 +520,11 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                   .filter((g) => g.resource === key)
                   .map((g) => (
                     <span key={g.id} className="gain-indicator">
+                      {/* Sprite drops in from above the panel, as if flying in
+                          from the board, then settles onto the chip. */}
+                      <span className="gain-fly">
+                        <ResourceSprite resource={key} size={20} />
+                      </span>
                       +{g.amount}
                     </span>
                   ))}
@@ -588,11 +614,17 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
               {state.log
                 .slice(-40)
                 .reverse()
-                .map((entry, i) => (
-                  <div key={i} className={`log-entry ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>
-                    {entry}
-                  </div>
-                ))}
+                .map((entry, i) =>
+                  entry.startsWith(ROUND_MARKER) ? (
+                    <div key={i} className="log-round">
+                      {entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}
+                    </div>
+                  ) : (
+                    <div key={i} className={`log-entry ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>
+                      {entry}
+                    </div>
+                  ),
+                )}
             </div>
           )}
           <form

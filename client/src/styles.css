@@ -517,8 +517,28 @@ body {
   padding: 2px 7px;
   border-radius: 999px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   animation: gain-float-up 1.6s ease forwards;
   pointer-events: none;
+}
+
+/* The harvested resource sprite flies down from the board into the chip. */
+.gain-fly {
+  display: inline-flex;
+  animation: gain-fly-in 0.6s ease-out both;
+}
+
+@keyframes gain-fly-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-70px) scale(1.4);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes gain-float-up {
@@ -1519,4 +1539,45 @@ body {
 
 .weather-icon {
   font-size: 1rem;
+}
+
+/* Round divider inside the log. */
+.log-round {
+  text-align: center;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7fa7b0;
+  margin: 4px 0 2px;
+  position: relative;
+}
+.log-round::before,
+.log-round::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 28%;
+  height: 1px;
+  background: #2a4a4f;
+}
+.log-round::before { left: 4px; }
+.log-round::after { right: 4px; }
+
+/* Recenter button: snaps the map back to frame the whole island. */
+.recenter-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 20;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #2a4a4f;
+  background: rgba(13, 27, 30, 0.85);
+  color: #f1faee;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

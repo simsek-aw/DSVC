@@ -140,6 +140,24 @@ export function HexBoard({
     setView((v) => ({ ...v, scale: Math.min(120, Math.max(20, v.scale - e.deltaY * 0.05)) }));
   };
 
+  // Frame the whole island: fit its bounding box into the board and centre it.
+  const recenter = () => {
+    if (state.tiles.length === 0) return;
+    const pts = state.tiles.map((t) => axialToPixel(t.coord, 1)); // unscaled centres
+    const minX = Math.min(...pts.map((p) => p.x));
+    const maxX = Math.max(...pts.map((p) => p.x));
+    const minY = Math.min(...pts.map((p) => p.y));
+    const maxY = Math.max(...pts.map((p) => p.y));
+    const spanX = maxX - minX + 2; // +2 board units of margin for the hex edges
+    const spanY = maxY - minY + 2;
+    const w = svgRef.current?.clientWidth ?? 400;
+    const h = svgRef.current?.clientHeight ?? 400;
+    const scale = Math.max(20, Math.min(120, Math.min(w / spanX, h / spanY)));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setView({ scale, x: -cx * scale, y: -cy * scale });
+  };
+
   const px = (coord: AxialCoord) => axialToPixel(coord, view.scale);
   const me = state.players.find((p) => p.id === myPlayerId);
 
@@ -174,6 +192,7 @@ export function HexBoard({
   };
 
   return (
+    <>
     <svg
       ref={svgRef}
       className="hex-board"
@@ -351,6 +370,10 @@ export function HexBoard({
         />
       </g>
     </svg>
+    <button className="recenter-btn" onClick={recenter} title="Karte zentrieren" aria-label="Karte zentrieren">
+      ⌖
+    </button>
+    </>
   );
 }
 

@@ -192,6 +192,8 @@ export const HAND_LIMIT_ON_SEVEN = 7; // more than this and you discard half on 
 // Chat messages live in the same log stream; this marker is what lets the UI
 // tell a player's message apart from an event the engine wrote.
 export const CHAT_PREFIX = "💬 ";
+// Round divider written into the log at the start of each new round.
+export const ROUND_MARKER = "———";
 export const CHAT_MAX_LENGTH = 160;
 // Physical pieces each player owns, classic Catan counts. City upgrades hand
 // the settlement token back, so the two are capped independently.

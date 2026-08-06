@@ -78,19 +78,23 @@ export function WaterPatternTile({ id, transform }: { id: string; transform?: st
   );
 }
 
-/** Full-bleed sea for screens outside the board (lobby, waiting room). */
+/** Full-bleed sea for screens outside the board (lobby, waiting room). Flat, to
+ * match the game board's flat sea. */
 export function WaterBackdrop() {
   return (
-    <svg className="water-backdrop" aria-hidden="true">
+    <svg className="water-backdrop" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 100 100">
       <defs>
-        <WaterPatternTile id="water-backdrop-tile" transform="scale(1.6)" />
-        <radialGradient id="water-backdrop-vignette" cx="50%" cy="40%" r="80%">
+        <linearGradient id="water-backdrop-sea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#46d2e3" />
+          <stop offset="100%" stopColor="#137f98" />
+        </linearGradient>
+        <radialGradient id="water-backdrop-vignette" cx="50%" cy="38%" r="80%">
           <stop offset="0%" stopColor="#0d1b1e" stopOpacity="0.05" />
-          <stop offset="100%" stopColor="#0d1b1e" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#0d1b1e" stopOpacity="0.55" />
         </radialGradient>
       </defs>
-      <rect width="100%" height="100%" fill="url(#water-backdrop-tile)" />
-      <rect width="100%" height="100%" fill="url(#water-backdrop-vignette)" />
+      <rect width="100" height="100" fill="url(#water-backdrop-sea)" />
+      <rect width="100" height="100" fill="url(#water-backdrop-vignette)" />
     </svg>
   );
 }

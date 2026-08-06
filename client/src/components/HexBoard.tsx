@@ -44,15 +44,26 @@ export interface MapInfo {
   text: string;
 }
 
+// Flat mode: sea and terrain become clean solid colours (with a soft sea
+// gradient and soft coast), while all icons/sprites stay pixel-art. Flip to
+// false to get the fully pixel-textured board back.
+const FLAT = true;
+
 const TERRAIN_COLORS: Record<string, string> = {
-  wood: "#2d6a4f",
-  brick: "#bc6c25",
-  ore: "#6c757d",
-  wheat: "#e9c46a",
-  sheep: "#a7c957",
-  desert: "#d4a373",
-  unknown: "#1b263b",
+  wood: "#3a8f5f",
+  brick: "#c9773a",
+  ore: "#7c8791",
+  wheat: "#eec860",
+  sheep: "#a7cf5c",
+  desert: "#e0b784",
+  unknown: "#22364a",
 };
+
+// Soft coast + sea tones for flat mode.
+const FLAT_SAND = "#efdca8";
+const FLAT_SHALLOW = "#6fdbec";
+const FLAT_SEA_TOP = "#46d2e3";
+const FLAT_SEA_BOTTOM = "#158fa8";
 
 function tilePolygonPoints(center: { x: number; y: number }, size: number): string {
   return hexCorners(center, size)
@@ -232,7 +243,7 @@ export function HexBoard({
         centerX={(svgRef.current?.clientWidth ?? 400) / 2}
         centerY={(svgRef.current?.clientHeight ?? 400) / 2}
       />
-      <rect x={0} y={0} width="100%" height="100%" fill="url(#water)" />
+      <rect x={0} y={0} width="100%" height="100%" fill={FLAT ? "url(#seaGradient)" : "url(#water)"} />
       <rect x={0} y={0} width="100%" height="100%" fill="url(#waterVignette)" />
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
         <CoastLayer tiles={state.tiles} scale={view.scale} />
@@ -594,11 +605,16 @@ function MarkerLayer({
  * scalloped edge that falls out of it looks hand-drawn rather than geometric.
  */
 function CoastLayer({ tiles, scale }: { tiles: Tile[]; scale: number }) {
-  const rings: { factor: number; fill: string; opacity?: number }[] = [
-    { factor: 1.42, fill: "url(#terrain-shallow)", opacity: 0.5 },
-    { factor: 1.28, fill: "url(#terrain-shallow)" },
-    { factor: 1.14, fill: "url(#terrain-sand)" },
-  ];
+  const rings: { factor: number; fill: string; opacity?: number }[] = FLAT
+    ? [
+        { factor: 1.34, fill: FLAT_SHALLOW, opacity: 0.5 }, // soft light-water halo
+        { factor: 1.15, fill: FLAT_SAND }, // sand shore
+      ]
+    : [
+        { factor: 1.42, fill: "url(#terrain-shallow)", opacity: 0.5 },
+        { factor: 1.28, fill: "url(#terrain-shallow)" },
+        { factor: 1.14, fill: "url(#terrain-sand)" },
+      ];
   return (
     <g pointerEvents="none">
       {rings.map((ring) => (
@@ -651,12 +667,22 @@ function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: nu
   const transform = `translate(${view.x + centerX}, ${view.y + centerY}) scale(${view.scale / 48})`;
   return (
     <defs>
-      <WaterPatternTile id="water" transform={transform} />
-      <TerrainPatterns scale={view.scale} />
+      {FLAT ? (
+        // A clean top-to-bottom sea gradient — no pixel noise.
+        <linearGradient id="seaGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={FLAT_SEA_TOP} />
+          <stop offset="100%" stopColor={FLAT_SEA_BOTTOM} />
+        </linearGradient>
+      ) : (
+        <>
+          <WaterPatternTile id="water" transform={transform} />
+          <TerrainPatterns scale={view.scale} />
+        </>
+      )}
       {/* Darkens the edges so the island stays the focus. */}
       <radialGradient id="waterVignette" cx="50%" cy="42%" r="75%">
         <stop offset="0%" stopColor="#0d1b1e" stopOpacity="0" />
-        <stop offset="100%" stopColor="#0d1b1e" stopOpacity="0.5" />
+        <stop offset="100%" stopColor="#0d1b1e" stopOpacity={FLAT ? 0.28 : 0.5} />
       </radialGradient>
     </defs>
   );
@@ -775,9 +801,11 @@ function TilePiece({
   // dimmed and dashed so it stays visibly "not officially uncovered yet".
   const known = tile.revealed || scouted;
   const fill = known
-    ? TERRAIN_TEXTURES[tile.terrain]
-      ? `url(#terrain-${tile.terrain})`
-      : TERRAIN_COLORS[tile.terrain]
+    ? FLAT || !TERRAIN_TEXTURES[tile.terrain]
+      ? TERRAIN_COLORS[tile.terrain]
+      : `url(#terrain-${tile.terrain})`
+    : FLAT
+    ? "#22364a"
     : "#1b263b";
 
   return (

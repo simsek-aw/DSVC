@@ -12,14 +12,20 @@ import {
   RESOURCE_TYPES,
   SCOUT_COST,
   TILE_SIZE,
+  HAND_LIMIT_ON_SEVEN,
+  VICTORY_POINTS_TO_WIN,
   axialKey,
   bestBankRatio,
   buildBoardGraph,
+  handSize,
+  longestRoadLength,
   tilesTouchingVertex,
+  totalVictoryPoints,
 } from "@canos/shared";
 import { HexBoard, BuildMode, MapInfo, BoardApi } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
+import { VictoryScreen } from "./VictoryScreen";
 import { ResourceSprite, PixelDie } from "./PixelIcons";
 
 interface Props {
@@ -161,6 +167,13 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     !isMyTurn && (state.phase === "mainGame" || state.phase === "setup")
       ? `Wartet auf ${currentPlayer?.name ?? "…"}${currentConnected ? " …" : " (offline)"}`
       : null;
+
+  // My own progress — shown only to me, so opponents stay a guessing game.
+  const myVP = totalVictoryPoints(state, myPlayerId);
+  const myRoad = longestRoadLength(state.roads, myPlayerId);
+  const myKnights = me?.knightsPlayed ?? 0;
+  const myHand = me ? handSize(me) : 0;
+  const overHandLimit = myHand > HAND_LIMIT_ON_SEVEN;
 
   const exitBuildMode = () => {
     setBuildMode(null);
@@ -415,6 +428,9 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       {flights.map((f) => (
         <FlyingSprite key={f.id} flight={f} />
       ))}
+      {state.phase === "ended" && (
+        <VictoryScreen state={state} myPlayerId={myPlayerId} sendAction={sendAction} onLeave={onLeave} />
+      )}
       <NegotiationTable state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
       <DiscardPanel state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
       <StealPanel state={state} myPlayerId={myPlayerId} sendAction={sendAction} />
@@ -550,6 +566,25 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
         {myActionHint && <div className="action-hint you">{myActionHint}</div>}
         {waitingFor && <div className="action-hint waiting">⏳ {waitingFor}</div>}
+
+        {/* My own score + progress toward the two bonus cards (mine only). */}
+        {state.phase === "mainGame" && (
+          <div className="my-progress" title="Nur du siehst deinen Punktestand">
+            <span className="vp-badge">🏆 {myVP}/{VICTORY_POINTS_TO_WIN}</span>
+            <span className={state.longestRoadPlayerId === myPlayerId ? "won" : ""} title="Längste Straße (ab 5)">
+              🛣️ {myRoad}
+              {state.longestRoadPlayerId === myPlayerId && " 🏅"}
+            </span>
+            <span className={state.largestArmyPlayerId === myPlayerId ? "won" : ""} title="Größte Rittermacht (ab 3)">
+              ⚔️ {myKnights}
+              {state.largestArmyPlayerId === myPlayerId && " 🏅"}
+            </span>
+          </div>
+        )}
+
+        {overHandLimit && (
+          <div className="hand-warning">⚠️ {myHand} Karten — bei einer 7 wirfst du die Hälfte ab!</div>
+        )}
 
         {/* My remaining stock of pieces. */}
         {(state.phase === "mainGame" || state.phase === "setup") && (

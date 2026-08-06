@@ -1586,3 +1586,104 @@ body {
   font-size: 0.85rem;
   color: #d8f3ec;
 }
+
+/* My own score + bonus-card progress (visible only to me). */
+.my-progress {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #cfe6df;
+  padding: 2px 0;
+}
+.my-progress .vp-badge {
+  font-weight: 700;
+  color: #f4d35e;
+}
+.my-progress .won {
+  color: #f4d35e;
+  font-weight: 700;
+}
+
+/* Discard-on-7 warning. */
+.hand-warning {
+  background: #3f2a1d;
+  border: 1px solid #f4a261;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  color: #ffe3c2;
+  text-align: center;
+}
+
+/* Victory overlay. */
+.victory-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 14, 16, 0.82);
+  padding: 16px;
+}
+.victory-box {
+  background: #10242a;
+  border: 1px solid #2a9d8f;
+  border-radius: 16px;
+  padding: 20px;
+  width: min(420px, 94vw);
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.victory-crown {
+  font-size: 2.6rem;
+}
+.victory-box h2 {
+  margin: 4px 0 2px;
+}
+.victory-standings {
+  list-style: none;
+  margin: 14px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.victory-standings li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 2px solid;
+  border-radius: 10px;
+  background: #142c30;
+  font-size: 0.9rem;
+}
+.victory-standings li.winner {
+  box-shadow: 0 0 0 2px #f4d35e inset;
+}
+.victory-rank {
+  color: #6b8f94;
+  font-weight: 700;
+  width: 1.4em;
+}
+.victory-name {
+  flex: 1 1 auto;
+  text-align: left;
+}
+.victory-badges {
+  display: flex;
+  gap: 3px;
+}
+.victory-vp {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #f4d35e;
+}
+.victory-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

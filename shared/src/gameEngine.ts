@@ -1209,6 +1209,27 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       };
     }
 
+    case "restartGame": {
+      if (state.phase !== "ended") throw new GameError("Neustart erst nach Spielende möglich.");
+      if (state.players[0]?.id !== playerId) throw new GameError("Nur der Host kann ein neues Spiel starten.");
+      // Keep the seats (id/name/colour/connection), reset everything else back
+      // to a fresh lobby so the host can start a new round with a new map.
+      const fresh = createLobby(state.roomId);
+      return {
+        ...fresh,
+        demoMode: state.demoMode,
+        players: state.players.map((p) => ({
+          ...p,
+          resources: emptyResources(),
+          developmentCards: [],
+          knightsPlayed: 0,
+          victoryPoints: 0,
+          turnOrderRoll: null,
+        })),
+        log: [...state.log.slice(-40), "🔄 Neues Spiel — zurück in die Lobby."],
+      };
+    }
+
     default:
       throw new GameError("Unbekannte Aktion.");
   }

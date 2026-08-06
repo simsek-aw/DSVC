@@ -239,4 +239,5 @@ export type ClientAction =
   | { type: "changeNegotiationOffer"; resource: ResourceType; delta: 1 | -1 }
   | { type: "setNegotiationConfirmed"; confirmed: boolean }
   | { type: "cancelNegotiation" }
-  | { type: "endTurn" };
+  | { type: "endTurn" }
+  | { type: "restartGame" };

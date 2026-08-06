@@ -74,6 +74,13 @@ body {
   filter: drop-shadow(0 6px 0 rgba(13, 27, 30, 0.35));
 }
 
+.engraved-title {
+  display: block;
+  width: min(380px, 88vw);
+  margin: 0 auto 4px;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.55));
+}
+
 .lobby-screen {
   position: relative;
   margin: auto;
@@ -340,14 +347,18 @@ body {
 
 .sidebar {
   width: 100%;
-  padding: 8px 10px;
+  padding: 6px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   /* The sidebar itself never scrolls: its upper part does, so the dock at the
      bottom can never be pushed out of view. */
   overflow: hidden;
   min-height: 0;
+  /* The map is the centrepiece: the dock never takes more than this share of
+     the screen. After that the scroll area handles overflow instead of eating
+     into the board. */
+  max-height: 50vh;
   background: #10242a;
 }
 
@@ -357,12 +368,14 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 @media (min-width: 900px) {
   .sidebar {
     width: 320px;
+    /* On a wide screen the sidebar is a full-height side column, not a dock. */
+    max-height: none;
   }
 }
 
@@ -407,11 +420,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   background: #142c30;
   border: 1px solid #2a4a4f;
-  border-radius: 10px;
-  padding: 6px 4px;
+  border-radius: 8px;
+  padding: 4px 2px;
   color: #fff;
   cursor: pointer;
 }
@@ -422,19 +435,14 @@ body {
 }
 
 .build-tile-icon {
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   line-height: 1;
-}
-
-.build-tile-label {
-  font-size: 0.7rem;
-  color: #a8dadc;
 }
 
 .build-tile-cost {
   display: flex;
-  gap: 4px;
-  font-size: 0.7rem;
+  gap: 3px;
+  font-size: 0.66rem;
 }
 
 .build-tile-cost-item {
@@ -530,12 +538,12 @@ body {
 .resource-chip {
   position: relative;
   background: #142c30;
-  padding: 5px 4px;
+  padding: 3px 2px;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 0;
 }
 
 .resource-chip.requested {
@@ -1455,8 +1463,8 @@ body {
 /* What you should do now, or who the game is waiting on. */
 .action-hint {
   border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 0.85rem;
+  padding: 4px 10px;
+  font-size: 0.78rem;
   font-weight: 600;
   text-align: center;
 }

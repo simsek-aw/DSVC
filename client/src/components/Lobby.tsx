@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { socket } from "../socket";
-import { PixelTitle } from "./PixelTitle";
+import { EngravedTitle } from "./EngravedTitle";
 import { WaterBackdrop } from "./Water";
 
 export function Lobby() {
@@ -10,7 +10,7 @@ export function Lobby() {
   return (
     <div className="lobby-screen">
       <WaterBackdrop />
-      <PixelTitle lines={["CANOS", "INCOGNITA"]} />
+      <EngravedTitle top="Canos" main="INCOGNITA" />
       <p className="subtitle">Ein verdecktes Inselabenteuer für 2–6 Spieler</p>
 
       <input

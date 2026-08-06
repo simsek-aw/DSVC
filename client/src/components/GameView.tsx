@@ -870,10 +870,9 @@ function BuildTile({
       className={`build-tile ${active ? "toggle-active" : ""}`}
       disabled={!affordable}
       onClick={onClick}
-      title={!affordable ? "Nicht genug Rohstoffe" : undefined}
+      title={affordable ? label : `${label} — nicht genug Rohstoffe`}
     >
       <span className="build-tile-icon">{icon}</span>
-      <span className="build-tile-label">{label}</span>
       <span className="build-tile-cost">
         {RESOURCE_TYPES.filter((r) => (cost[r] ?? 0) > 0).map((r) => (
           <span key={r} className="build-tile-cost-item">

@@ -23,6 +23,8 @@ import {
   totalVictoryPoints,
   objectiveComplete,
   SECRET_OBJECTIVES,
+  SPECIAL_BUILDINGS,
+  SpecialBuildingId,
 } from "@canos/shared";
 import { HexBoard, BuildMode, MapInfo, BoardApi } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
@@ -724,6 +726,19 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
               active={buildMode === "scout"}
               onClick={() => setBuildMode(buildMode === "scout" ? null : "scout")}
             />
+            {state.settings.specialBuildings &&
+              (Object.values(SPECIAL_BUILDINGS)).map((spec) => (
+                <BuildTile
+                  key={spec.id}
+                  icon={spec.icon}
+                  label={spec.title}
+                  cost={spec.cost}
+                  resources={me?.resources}
+                  active={false}
+                  built={me?.specialBuildings.includes(spec.id as SpecialBuildingId) ?? false}
+                  onClick={() => sendAction({ type: "buildSpecial", building: spec.id })}
+                />
+              ))}
           </div>
         )}
 
@@ -1126,6 +1141,7 @@ function BuildTile({
   resources,
   active,
   onClick,
+  built = false,
 }: {
   icon: string;
   label: string;
@@ -1133,24 +1149,29 @@ function BuildTile({
   resources: Record<ResourceType, number> | undefined;
   active: boolean;
   onClick: () => void;
+  built?: boolean;
 }) {
   const affordable = canAfford(resources, cost);
   return (
     <button
-      className={`build-tile ${active ? "toggle-active" : ""}`}
-      disabled={!affordable}
+      className={`build-tile ${active ? "toggle-active" : ""} ${built ? "built" : ""}`}
+      disabled={built || !affordable}
       onClick={onClick}
-      title={affordable ? label : `${label} — nicht genug Rohstoffe`}
+      title={built ? `${label} — bereits gebaut` : affordable ? label : `${label} — nicht genug Rohstoffe`}
     >
       <span className="build-tile-icon">{icon}</span>
-      <span className="build-tile-cost">
-        {RESOURCE_TYPES.filter((r) => (cost[r] ?? 0) > 0).map((r) => (
-          <span key={r} className="build-tile-cost-item">
-            <ResourceSprite resource={r} size={12} />
-            {cost[r]}
-          </span>
-        ))}
-      </span>
+      {built ? (
+        <span className="build-tile-cost built-tag">✓ gebaut</span>
+      ) : (
+        <span className="build-tile-cost">
+          {RESOURCE_TYPES.filter((r) => (cost[r] ?? 0) > 0).map((r) => (
+            <span key={r} className="build-tile-cost-item">
+              <ResourceSprite resource={r} size={12} />
+              {cost[r]}
+            </span>
+          ))}
+        </span>
+      )}
     </button>
   );
 }

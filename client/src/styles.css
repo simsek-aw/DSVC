@@ -493,6 +493,21 @@ body {
   cursor: not-allowed;
 }
 
+/* An already-bought special building: dimmed but legibly marked as done. */
+.build-tile.built {
+  opacity: 0.6;
+  border-color: #2a9d8f;
+  background: #123a34;
+}
+.build-tile.built:disabled {
+  opacity: 0.6;
+}
+.build-tile-cost.built-tag {
+  color: #7ed957;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .build-tile-icon {
   font-size: 1.15rem;
   line-height: 1;

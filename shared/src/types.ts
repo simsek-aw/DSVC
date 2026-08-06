@@ -74,7 +74,28 @@ export interface Player {
   // owner ever sees it (viewFor blanks it for everyone else until the game ends);
   // when its condition is met it silently adds hidden victory points.
   objective: SecretObjectiveId | null;
+  // Special buildings this player has bought (each once, each worth +1 VP), when
+  // the room enables them. No board placement — a pure extra victory-point path.
+  specialBuildings: SpecialBuildingId[];
 }
+
+// Optional off-board buildings, each buildable once per player for a flat cost
+// and worth one victory point. Deliberately effect-free: just another VP route.
+export type SpecialBuildingId = "watchtower" | "market" | "harbormaster";
+
+export interface SpecialBuilding {
+  id: SpecialBuildingId;
+  title: string;
+  icon: string;
+  cost: Partial<Record<ResourceType, number>>;
+  vp: number;
+}
+
+export const SPECIAL_BUILDINGS: Record<SpecialBuildingId, SpecialBuilding> = {
+  watchtower: { id: "watchtower", title: "Späherturm", icon: "🗼", cost: { wood: 2, ore: 1 }, vp: 1 },
+  market: { id: "market", title: "Markthalle", icon: "🏛️", cost: { wheat: 2, ore: 1 }, vp: 1 },
+  harbormaster: { id: "harbormaster", title: "Hafenmeisterei", icon: "🚢", cost: { brick: 2, sheep: 1 }, vp: 1 },
+};
 
 // Hidden missions. Each is checkable purely from board state so scoring is
 // deterministic, and each grants extra victory points nobody else can see coming.
@@ -276,4 +297,5 @@ export type ClientAction =
   | { type: "cancelNegotiation" }
   | { type: "endTurn" }
   | { type: "restartGame" }
-  | { type: "setRoomSettings"; settings: Partial<GameSettings> };
+  | { type: "setRoomSettings"; settings: Partial<GameSettings> }
+  | { type: "buildSpecial"; building: SpecialBuildingId };

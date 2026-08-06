@@ -39,6 +39,8 @@ export type {
   GameSettings,
   SecretObjective,
   SecretObjectiveId,
+  SpecialBuilding,
+  SpecialBuildingId,
 } from "./types";
 export {
   RESOURCE_TYPES,
@@ -57,6 +59,7 @@ export {
   LONGEST_ROAD_BONUS,
   LARGEST_ARMY_BONUS,
   SECRET_OBJECTIVES,
+  SPECIAL_BUILDINGS,
   defaultSettings,
 } from "./types";
 

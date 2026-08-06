@@ -32,6 +32,8 @@ import {
   GameSettings,
   SecretObjectiveId,
   SECRET_OBJECTIVES,
+  SpecialBuildingId,
+  SPECIAL_BUILDINGS,
   defaultSettings,
 } from "./types";
 
@@ -114,6 +116,7 @@ export function addPlayer(state: GameState, playerId: string, name: string): Gam
     victoryPoints: 0,
     turnOrderRoll: null,
     objective: null,
+    specialBuildings: [],
   };
   return { ...state, players: [...state.players, player], log: [...state.log, `${name} ist beigetreten.`] };
 }
@@ -424,6 +427,7 @@ export function totalVictoryPoints(state: GameState, playerId: string): number {
   if (state.longestRoadPlayerId === playerId) total += LONGEST_ROAD_BONUS;
   if (state.largestArmyPlayerId === playerId) total += LARGEST_ARMY_BONUS;
   if (player.objective && objectiveComplete(state, playerId)) total += SECRET_OBJECTIVES[player.objective].bonus;
+  for (const sb of player.specialBuildings) total += SPECIAL_BUILDINGS[sb].vp;
   return total;
 }
 
@@ -1281,6 +1285,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
           victoryPoints: 0,
           turnOrderRoll: null,
           objective: null,
+          specialBuildings: [],
         })),
         log: [...state.log.slice(-40), "🔄 Neues Spiel — zurück in die Lobby."],
       };
@@ -1290,6 +1295,26 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       if (state.phase !== "lobby") throw new GameError("Einstellungen nur in der Lobby änderbar.");
       if (state.players[0]?.id !== playerId) throw new GameError("Nur der Host kann die Raum-Einstellungen ändern.");
       return { ...state, settings: { ...state.settings, ...action.settings } };
+    }
+
+    case "buildSpecial": {
+      if (!state.settings.specialBuildings) throw new GameError("Sonderbauten sind in diesem Raum nicht aktiviert.");
+      if (state.phase !== "mainGame") throw new GameError("Sonderbauten kannst du nur im Hauptspiel bauen.");
+      if (state.turnOrder[state.currentPlayerIndex] !== playerId) throw new GameError("Du bist nicht am Zug.");
+      const player = state.players.find((p) => p.id === playerId);
+      if (!player) throw new GameError("Spieler nicht gefunden.");
+      const spec = SPECIAL_BUILDINGS[action.building];
+      if (!spec) throw new GameError("Unbekannter Sonderbau.");
+      if (player.specialBuildings.includes(action.building))
+        throw new GameError(`${spec.title} hast du bereits gebaut.`);
+      if (!hasEnoughResources(player, spec.cost)) throw new GameError(`Nicht genug Rohstoffe für ${spec.title}.`);
+      const players = state.players.map((p) =>
+        p.id === playerId
+          ? { ...payCost(p, spec.cost), specialBuildings: [...p.specialBuildings, action.building] }
+          : p
+      );
+      const next = { ...state, players, log: [...state.log, `${spec.icon} ${player.name} baut ${spec.title} (+1 Siegpunkt).`] };
+      return checkVictory(next);
     }
 
     default:

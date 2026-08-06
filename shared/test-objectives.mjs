@@ -74,3 +74,35 @@ function assert(cond, msg) {
 }
 
 console.log("objectives: all passed");
+
+// --- Special buildings: gated by the room toggle, once each, +1 VP each. ---
+import { SPECIAL_BUILDINGS } from "./dist/index.js";
+{
+  let s = createLobby("SB1");
+  s = addPlayer(s, "A", "Anna");
+  s = addPlayer(s, "B", "Ben");
+  // disabled by default -> rejected
+  let threw = false;
+  try { applyAction(s, "A", { type: "buildSpecial", building: "market" }); } catch { threw = true; }
+  assert(threw, "buildSpecial rejected when disabled");
+
+  s = applyAction(s, "A", { type: "setRoomSettings", settings: { specialBuildings: true } });
+  s = startGame(s);
+  s = applyAction(s, "A", { type: "rollTurnOrder" });
+  s = applyAction(s, "B", { type: "rollTurnOrder" });
+  // force into mainGame with A on turn and plenty of resources
+  s = { ...s, phase: "mainGame", currentPlayerIndex: 0, turnOrder: ["A", "B"],
+    players: s.players.map((p) => (p.id === "A" ? { ...p, resources: { wood: 5, brick: 5, ore: 5, wheat: 5, sheep: 5 } } : p)) };
+  const before = totalVictoryPoints(s, "A");
+  s = applyAction(s, "A", { type: "buildSpecial", building: "market" });
+  assert(s.players.find((p) => p.id === "A").specialBuildings.includes("market"), "market recorded");
+  assert(totalVictoryPoints(s, "A") === before + 1, "special building adds +1 VP");
+  const spentOre = 5 - s.players.find((p) => p.id === "A").resources.ore;
+  assert(spentOre === (SPECIAL_BUILDINGS.market.cost.ore ?? 0), "market cost deducted");
+  // cannot build the same one twice
+  let threw2 = false;
+  try { applyAction(s, "A", { type: "buildSpecial", building: "market" }); } catch { threw2 = true; }
+  assert(threw2, "same special building rejected twice");
+}
+
+console.log("special buildings: all passed");

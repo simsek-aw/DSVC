@@ -539,6 +539,72 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   // Only players actually holding the wanted resource get asked to help out.
   const canAnswerRequest = !!request && !iAmRequester && !!me && me.resources[request.resource] > 0 && !state.pendingTrade;
 
+  // Log + chat, pinned at the very bottom of the dock (below the action row).
+  const logPanel = (
+    <div className="log-panel">
+      {!logExpanded && (
+        <button className="log-preview" onClick={() => setLogExpanded(true)} title="Verlauf & Chat öffnen">
+          <span className="log-preview-lines">
+            {state.log.slice(-3).map((entry, i) =>
+              entry.startsWith(ROUND_MARKER) ? (
+                <span key={i} className="log-round-inline">{entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}</span>
+              ) : (
+                <span key={i} className={`log-line ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>{entry}</span>
+              ),
+            )}
+          </span>
+          <span className="log-toggle-arrow">▸</span>
+        </button>
+      )}
+      {logExpanded && (
+        <>
+          <button className="log-header" onClick={() => setLogExpanded(false)}>
+            <span className="log-latest">Verlauf &amp; Chat</span>
+            <span className="log-toggle-arrow">▾</span>
+          </button>
+          <div className="log-entries">
+            {state.log
+              .slice(-40)
+              .reverse()
+              .map((entry, i) =>
+                entry.startsWith(ROUND_MARKER) ? (
+                  <div key={i} className="log-round">
+                    {entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}
+                  </div>
+                ) : (
+                  <div key={i} className={`log-entry ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>
+                    {entry}
+                  </div>
+                ),
+              )}
+          </div>
+        </>
+      )}
+      <form
+        className="chat-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const text = chatDraft.trim();
+          if (!text) return;
+          sendAction({ type: "sendChat", text });
+          setChatDraft("");
+          setLogExpanded(true);
+        }}
+      >
+        <input
+          className="chat-input"
+          placeholder="Nachricht an alle …"
+          value={chatDraft}
+          maxLength={CHAT_MAX_LENGTH}
+          onChange={(e) => setChatDraft(e.target.value)}
+        />
+        <button className="chat-send" type="submit" disabled={!chatDraft.trim()} aria-label="Senden">
+          ➤
+        </button>
+      </form>
+    </div>
+  );
+
   // The build palette, unfolded above the action row when "Bauen" is toggled.
   const buildPalette = (
     <div className={`build-bar ${state.settings.specialBuildings ? "has-more" : ""}`}>
@@ -894,72 +960,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>
         )}
 
-        {/* Log and chat are one stream: messages land where players already
-            look for events, and the input sits right underneath. */}
-        <div className="log-panel">
-          {/* Collapsed: a 3-line rolling preview (newest at the bottom) so a
-              short chat stays readable without opening the full history. */}
-          {!logExpanded && (
-            <button className="log-preview" onClick={() => setLogExpanded(true)} title="Verlauf & Chat öffnen">
-              <span className="log-preview-lines">
-                {state.log.slice(-3).map((entry, i) =>
-                  entry.startsWith(ROUND_MARKER) ? (
-                    <span key={i} className="log-round-inline">{entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}</span>
-                  ) : (
-                    <span key={i} className={`log-line ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>{entry}</span>
-                  ),
-                )}
-              </span>
-              <span className="log-toggle-arrow">▸</span>
-            </button>
-          )}
-          {logExpanded && (
-            <>
-              <button className="log-header" onClick={() => setLogExpanded(false)}>
-                <span className="log-latest">Verlauf &amp; Chat</span>
-                <span className="log-toggle-arrow">▾</span>
-              </button>
-              <div className="log-entries">
-                {state.log
-                  .slice(-40)
-                  .reverse()
-                  .map((entry, i) =>
-                    entry.startsWith(ROUND_MARKER) ? (
-                      <div key={i} className="log-round">
-                        {entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}
-                      </div>
-                    ) : (
-                      <div key={i} className={`log-entry ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>
-                        {entry}
-                      </div>
-                    ),
-                  )}
-              </div>
-            </>
-          )}
-          <form
-            className="chat-row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const text = chatDraft.trim();
-              if (!text) return;
-              sendAction({ type: "sendChat", text });
-              setChatDraft("");
-              setLogExpanded(true);
-            }}
-          >
-            <input
-              className="chat-input"
-              placeholder="Nachricht an alle …"
-              value={chatDraft}
-              maxLength={CHAT_MAX_LENGTH}
-              onChange={(e) => setChatDraft(e.target.value)}
-            />
-            <button className="chat-send" type="submit" disabled={!chatDraft.trim()} aria-label="Senden">
-              ➤
-            </button>
-          </form>
-        </div>
+        {/* Log & chat live in the dock below, pinned under the action row. */}
 
         </div>
         {/* Bottom dock: pinned to the lower edge, its panels grow upward. */}
@@ -1103,6 +1104,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
               </div>
             </>
           )}
+          {/* Chat + 3-line log: the very bottom, always available (also mid-trade). */}
+          {logPanel}
         </div>
       </div>
     </div>

@@ -81,6 +81,19 @@ body {
   filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.55));
 }
 
+/* Supplied CANOS INCOGNITA wordmark on the dark start screen. */
+.wordmark {
+  display: block;
+  width: min(340px, 82vw);
+  height: auto;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.6));
+}
+/* Start/room screens: plain dark background (no sea pattern behind). */
+.lobby-screen.dark {
+  background: transparent;
+}
+
 .lobby-screen {
   position: relative;
   margin: auto;
@@ -921,10 +934,14 @@ body {
 
 .mode-hint {
   position: absolute;
-  bottom: 10px;
+  /* Just under the top banner — was at the bottom, where it hid behind the
+     player timeline. */
+  top: 58px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(244, 162, 97, 0.9);
+  z-index: 16;
+  max-width: calc(100% - 24px);
+  background: rgba(244, 162, 97, 0.95);
   color: #111;
   padding: 8px 14px;
   border-radius: 999px;
@@ -932,7 +949,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  white-space: nowrap;
+  text-align: center;
 }
 
 .badge {
@@ -1986,9 +2003,14 @@ body {
 
 /* Host-only room options in the waiting room. */
 .room-settings {
-  width: min(420px, 92vw);
-  margin: 6px auto 2px;
+  width: 100%;
+  margin: 6px 0 2px;
   text-align: left;
+}
+/* Toggle rows must not spill past the panel: they fill it and wrap text. */
+.room-settings .room-toggle {
+  width: 100%;
+  box-sizing: border-box;
 }
 .room-settings-title {
   font-size: 0.72rem;

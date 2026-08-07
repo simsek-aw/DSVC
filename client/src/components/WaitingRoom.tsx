@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GameState } from "@canos/shared";
+import { Wordmark } from "./Wordmark";
 import { shareInvite } from "../invite";
 
 interface Props {
@@ -26,8 +27,8 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
   };
 
   return (
-    <div className="lobby-screen">
-      <h1>Canos Incognita</h1>
+    <div className="lobby-screen dark">
+      <Wordmark />
       <p className="subtitle">
         Raum-Code: <span className="room-code">{roomId}</span> — teile ihn mit deinen Mitspielern
       </p>

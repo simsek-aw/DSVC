@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { socket } from "../socket";
-import { EngravedTitle } from "./EngravedTitle";
-import { WaterBackdrop } from "./Water";
+import { Wordmark } from "./Wordmark";
 import { roomFromUrl } from "../invite";
 
 export function Lobby() {
@@ -17,9 +16,8 @@ export function Lobby() {
   };
 
   return (
-    <div className="lobby-screen">
-      <WaterBackdrop />
-      <EngravedTitle top="Canos" main="INCOGNITA" />
+    <div className="lobby-screen dark">
+      <Wordmark />
       <p className="subtitle">Ein verdecktes Inselabenteuer für 2–6 Spieler</p>
 
       {/* Opened from an invite link: lead straight into joining that room. */}

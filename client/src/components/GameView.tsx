@@ -1117,6 +1117,18 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         {showTradePanel && me && state.phase === "mainGame" && isMyTurn && (
           <div className="trade-panel">
             <h4>Bankhandel</h4>
+            {/* Your live maritime rates — a harbour (2:1 / 3:1) is highlighted so
+                you can see at a glance where you get a better deal than 4:1. */}
+            <div className="bank-rates">
+              {RESOURCE_TYPES.map((r) => {
+                const ratio = bestBankRatio(state, myPlayerId, r);
+                return (
+                  <span key={r} className={`bank-rate${ratio < 4 ? " port" : ""}`} title={`${RESOURCE_LABELS[r]}: ${ratio}:1`}>
+                    {RESOURCE_LABELS[r].split(" ")[0]} {ratio}:1
+                  </span>
+                );
+              })}
+            </div>
             <div className="inline-picker">
               <select value={bankGive} onChange={(e) => setBankGive(e.target.value as ResourceType)}>
                 {RESOURCE_TYPES.map((r) => (

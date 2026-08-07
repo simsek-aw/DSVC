@@ -1053,6 +1053,31 @@ body {
   cursor: pointer;
 }
 
+.bank-rates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 2px 0 4px;
+}
+
+.bank-rate {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #16302f;
+  border: 1px solid #24484a;
+  color: #8fb3b0;
+  white-space: nowrap;
+}
+
+/* A held harbour gives a better-than-4:1 rate — call it out in gold. */
+.bank-rate.port {
+  background: #3a2f12;
+  border-color: #b8892e;
+  color: #ffd873;
+}
+
 .inline-picker {
   display: flex;
   align-items: center;

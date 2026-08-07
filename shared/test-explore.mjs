@@ -1,7 +1,7 @@
 // Engine tests for the two exploration tweaks: scouting and buried finds.
 import {
   createLobby, addPlayer, startGame, applyAction, viewFor, handSize,
-  TILE_SIZE, tileVertices, axialKey, axialNeighbors, buildBoardGraph, tilesTouchingVertex,
+  TILE_SIZE, tileVertices, axialKey, axialNeighbors, buildBoardGraph, tilesTouchingVertex, vertexKey,
 } from "./dist/index.js";
 
 function assert(cond, msg) {
@@ -100,11 +100,11 @@ s2 = applyAction(s2, "B", { type: "rollTurnOrder" });
 
 const cacheTile = s2.tiles.find((t) => t.treasure === "cache");
 const relicTile = s2.tiles.find((t) => t.treasure === "relic");
-s2 = { ...s2, phase: "setup", setupRound: 1, currentPlayerIndex: 0, setupStepAwaitingRoad: false };
 const who = s2.turnOrder[0];
 
-// Pick a vertex the board graph agrees touches the tile — a raw tileVertices[0]
-// can miss by a rounding hair and then reveal a neighbour instead of the tile.
+// Treasures are found during the MAIN game now (setup no longer fires them, so
+// the starting hand stays predictable). Build a settlement onto the tile via
+// the normal main-game path, seeding a connecting road so the build is legal.
 const graph2 = buildBoardGraph(s2.tiles, TILE_SIZE);
 const vertexTouching = (coord) => {
   for (const v of graph2.vertices.values()) {
@@ -112,30 +112,55 @@ const vertexTouching = (coord) => {
   }
   return tileVertices(coord, TILE_SIZE)[0];
 };
-
-const cacheVert = vertexTouching(cacheTile.coord);
-const before = s2.players.find((p) => p.id === who).resources[cacheTile.terrain];
-s2 = applyAction(s2, who, { type: "placeSetupSettlement", vertex: cacheVert });
-const after = s2.players.find((p) => p.id === who).resources[cacheTile.terrain];
-console.log("  Log:", s2.log[s2.log.length - 1]);
-assert(after >= before + 2, `Versteck bringt 2x ${cacheTile.terrain} (${before} -> ${after})`);
-assert(s2.tiles.find((t) => axialKey(t.coord) === axialKey(cacheTile.coord)).treasure === null, "Fund ist verbraucht");
-
-// Reveal the relic tile too (fresh state so placement rules don't collide).
-// Force the relic tile back to its unrevealed, still-buried state — the cache
-// sub-test above may have happened to sit next to it and already reveal it.
-let s3 = {
-  ...s2,
-  buildings: [],
-  setupStepAwaitingRoad: false,
-  setupRound: 1,
-  tiles: s2.tiles.map((t) => (axialKey(t.coord) === axialKey(relicTile.coord) ? { ...t, treasure: "relic", revealed: false } : t)),
+const edgeTouching = (vert) => {
+  for (const e of graph2.edges.values()) {
+    if (vertexKey(e.a) === vertexKey(vert) || vertexKey(e.b) === vertexKey(vert)) return e;
+  }
+  return null;
 };
-const relicVert = vertexTouching(relicTile.coord);
-const cardsBefore = s3.players.find((p) => p.id === who).developmentCards.length;
-s3 = applyAction(s3, who, { type: "placeSetupSettlement", vertex: relicVert });
-const cardsAfter = s3.players.find((p) => p.id === who).developmentCards.length;
-console.log("  Log:", s3.log[s3.log.length - 1]);
-assert(cardsAfter === cardsBefore + 1, "Relikt bringt eine Entwicklungskarte");
+const fullHand = { wood: 5, brick: 5, ore: 5, wheat: 5, sheep: 5 };
+const buildOnto = (state, tile) => {
+  const vert = vertexTouching(tile.coord);
+  return {
+    st: {
+      ...state,
+      phase: "mainGame",
+      currentPlayerIndex: state.turnOrder.indexOf(who),
+      lastDiceRoll: { die1: 3, die2: 3, total: 6 },
+      buildings: [],
+      roads: [{ edge: edgeTouching(vert), ownerId: who }],
+      // Isolate the treasure under test: the vertex touches up to three tiles,
+      // and a neighbouring curse/relic would otherwise skew the count.
+      tiles: state.tiles.map((t) =>
+        axialKey(t.coord) === axialKey(tile.coord) ? { ...t, revealed: false } : { ...t, treasure: null },
+      ),
+      players: state.players.map((p) => (p.id === who ? { ...p, resources: { ...fullHand } } : p)),
+    },
+    vert,
+  };
+};
+
+{
+  const { st, vert } = buildOnto(s2, cacheTile);
+  const before = st.players.find((p) => p.id === who).resources[cacheTile.terrain];
+  const done = applyAction(st, who, { type: "buildSettlement", vertex: vert });
+  const after = done.players.find((p) => p.id === who).resources[cacheTile.terrain];
+  // Building the settlement also pays its cost, which includes 1 of each of
+  // wood/brick/wheat/sheep (but no ore) — so net delta is +2 minus that cost.
+  const settleCost = { wood: 1, brick: 1, wheat: 1, sheep: 1, ore: 0 }[cacheTile.terrain] ?? 0;
+  console.log("  Log:", done.log[done.log.length - 1]);
+  assert(after === before + 2 - settleCost, `Versteck bringt 2x ${cacheTile.terrain} (${before} -> ${after})`);
+  assert(done.tiles.find((t) => axialKey(t.coord) === axialKey(cacheTile.coord)).treasure === null, "Fund ist verbraucht");
+}
+
+{
+  const base = { ...s2, tiles: s2.tiles.map((t) => (axialKey(t.coord) === axialKey(relicTile.coord) ? { ...t, treasure: "relic", revealed: false } : t)) };
+  const { st, vert } = buildOnto(base, relicTile);
+  const cardsBefore = st.players.find((p) => p.id === who).developmentCards.length;
+  const done = applyAction(st, who, { type: "buildSettlement", vertex: vert });
+  const cardsAfter = done.players.find((p) => p.id === who).developmentCards.length;
+  console.log("  Log:", done.log[done.log.length - 1]);
+  assert(cardsAfter === cardsBefore + 1, "Relikt bringt eine Entwicklungskarte");
+}
 
 console.log("\nALLE EXPLORATIONS-TESTS BESTANDEN");

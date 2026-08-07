@@ -16,8 +16,9 @@ s = addPlayer(s, "B", "Ben");
 s = startGame(s);
 s = applyAction(s, "A", { type: "rollTurnOrder" });
 s = applyAction(s, "B", { type: "rollTurnOrder" });
-// Clear buried treasures so only the starting-resource rule adds to a hand.
-s = { ...s, tiles: s.tiles.map((t) => ({ ...t, treasure: null })) };
+// Deliberately KEEP treasures on the board: the starting-resource grant must
+// match the adjacent tiles exactly regardless, because setup no longer fires
+// treasures (that was the "wrong starting resources" bug).
 
 const g = buildBoardGraph(s.tiles, TILE_SIZE);
 const freeVertex = () => {
@@ -52,11 +53,17 @@ assert(s.phase === "mainGame", "Aufbau ist beendet, Hauptspiel läuft");
 
 for (const p of s.players) {
   const v = secondSettlementVertex[p.id];
+  // One per adjacent non-desert tile, doubled on a boosted tile.
   const expected = tilesTouchingVertex(g, v)
     .map((c) => s.tiles.find((t) => t.coord.q === c.q && t.coord.r === c.r))
-    .filter((t) => t && t.terrain !== "desert").length;
-  assert(handSize(p) === expected, `${p.name} bekommt ${expected} Startrohstoffe (hat ${handSize(p)})`);
+    .filter((t) => t && t.terrain !== "desert")
+    .reduce((sum, t) => sum + (t.hasBoostToken ? 2 : 1), 0);
+  assert(handSize(p) === expected, `${p.name} bekommt exakt ${expected} Startrohstoffe (hat ${handSize(p)})`);
 }
+
+// No treasure was collected during setup (no cache/curse/relic log lines).
+const treasureLogs = s.log.filter((l) => /Versteck|Relikt|verfluchte Ruine/.test(l));
+assert(treasureLogs.length === 0, "keine Schätze während des Aufbaus ausgelöst");
 
 const gifts = s.log.filter((l) => l.startsWith("🎁"));
 assert(gifts.length === s.players.length, "jeder Spieler bekommt eine Startrohstoff-Logzeile");

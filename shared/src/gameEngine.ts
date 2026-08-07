@@ -180,7 +180,12 @@ function updatePlayer(state: GameState, playerId: string, fn: (p: Player) => Pla
 
 // Uncovers every tile around a freshly placed settlement and hands whoever
 // placed it any one-off find that was buried under a newly uncovered tile.
-function revealTilesTouching(state: GameState, vertex: { x: number; y: number }, finderId: string): GameState {
+function revealTilesTouching(
+  state: GameState,
+  vertex: { x: number; y: number },
+  finderId: string,
+  collectTreasures = true,
+): GameState {
   const graph = buildBoardGraph(state.tiles, TILE_SIZE);
   const touching = tilesTouchingVertex(graph, vertex);
   const touchingKeys = new Set(touching.map((c) => axialKey(c)));
@@ -191,9 +196,15 @@ function revealTilesTouching(state: GameState, vertex: { x: number; y: number },
     tiles: state.tiles.map((t) => (touchingKeys.has(axialKey(t.coord)) ? { ...t, revealed: true } : t)),
   };
 
-  for (const tile of newlyRevealed) {
-    if (!tile.treasure) continue;
-    next = collectTreasure(next, tile, finderId);
+  // During the opening placement we deliberately do NOT fire treasures: they
+  // would scramble the deterministic starting-resource grant so the hand no
+  // longer matches the surrounding tiles. Treasures are found by exploring
+  // (new settlements / scouting) once the main game is underway.
+  if (collectTreasures) {
+    for (const tile of newlyRevealed) {
+      if (!tile.treasure) continue;
+      next = collectTreasure(next, tile, finderId);
+    }
   }
   return next;
 }
@@ -628,21 +639,23 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
 
       const building: Building = { vertex: action.vertex, type: "settlement", ownerId: playerId };
       let next: GameState = { ...state, buildings: [...state.buildings, building], setupStepAwaitingRoad: true };
-      next = revealTilesTouching(next, action.vertex, playerId);
+      next = revealTilesTouching(next, action.vertex, playerId, false); // no treasures during setup
       next = updatePlayer(next, playerId, (p) => ({ ...p, victoryPoints: p.victoryPoints + 1 }));
 
       // Second settlement of setup grants immediate starting resources (classic
-      // Catan rule): one of each resource the settlement's tiles produce.
+      // Catan rule): one of each resource the settlement's tiles produce — a
+      // boosted tile yields double, matching how it pays out on every later roll.
       if (state.setupRound === 2) {
         const gained: Partial<Record<ResourceType, number>> = {};
         for (const coord of tilesTouchingVertex(graph, action.vertex)) {
           const tile = findTile(next, coord);
           if (tile.terrain === "desert") continue;
           const resource = tile.terrain as ResourceType;
-          gained[resource] = (gained[resource] ?? 0) + 1;
+          const amount = tile.hasBoostToken ? 2 : 1;
+          gained[resource] = (gained[resource] ?? 0) + amount;
           next = updatePlayer(next, playerId, (p) => ({
             ...p,
-            resources: { ...p.resources, [resource]: p.resources[resource] + 1 },
+            resources: { ...p.resources, [resource]: p.resources[resource] + amount },
           }));
         }
         const parts = RESOURCE_TYPES.filter((r) => gained[r]).map((r) => `${gained[r]}× ${TERRAIN_NAMES_DE[r]}`);

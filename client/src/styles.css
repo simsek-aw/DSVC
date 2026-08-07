@@ -2366,3 +2366,108 @@ body {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ── First-game mini-tutorial ─────────────────────────────────────────── */
+.tutorial-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(6, 14, 20, 0.72);
+  backdrop-filter: blur(3px);
+  animation: weather-tint-in 0.25s ease both;
+}
+
+.tutorial-card {
+  position: relative;
+  width: min(360px, 100%);
+  background: #12242a;
+  border: 1px solid #2a4a4f;
+  border-radius: 18px;
+  padding: 26px 22px 20px;
+  text-align: center;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  animation: build-pop 0.32s cubic-bezier(0.34, 1.56, 0.5, 1) both;
+}
+
+.tutorial-skip {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #7fa39f;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.tutorial-emoji {
+  font-size: 2.6rem;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.tutorial-card h3 {
+  margin: 6px 0 8px;
+  color: #ffd873;
+  font-size: 1.1rem;
+}
+
+.tutorial-card p {
+  margin: 0 0 14px;
+  color: #cfe6e2;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.tutorial-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2a4a4f;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.tutorial-dot.on {
+  background: #2a9d8f;
+  transform: scale(1.25);
+}
+
+.tutorial-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.tutorial-back,
+.tutorial-next {
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1px solid #2a4a4f;
+}
+
+.tutorial-back {
+  background: #17322f;
+  color: #a8dadc;
+}
+
+.tutorial-next {
+  background: #2a9d8f;
+  border-color: #2a9d8f;
+  color: #06231f;
+}

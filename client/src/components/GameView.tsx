@@ -30,6 +30,7 @@ import { HexBoard, BuildMode, MapInfo, BoardApi } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
 import { VictoryScreen } from "./VictoryScreen";
+import { MiniTutorial } from "./MiniTutorial";
 import { ResourceSprite, PixelDie } from "./PixelIcons";
 import { shareInvite } from "../invite";
 
@@ -682,6 +683,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
   return (
     <div className="game-root">
+      <MiniTutorial />
       {flights.map((f) => (
         <FlyingSprite key={f.id} flight={f} />
       ))}

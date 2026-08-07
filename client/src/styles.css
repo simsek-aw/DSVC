@@ -1090,6 +1090,96 @@ body {
   border-radius: 8px;
   padding: 4px;
 }
+/* When the chip sits at the bottom of the map, the trade menu opens upward. */
+.player-menu.up {
+  top: auto;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Combined turn-order timeline + player list, centred at the bottom of the map.
+   Each chip shows a player in play order (active one filled), and tapping it
+   opens the trade menu. */
+.player-timeline {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 130px); /* clear the dice (left) and recenter (right) */
+  padding: 4px 6px;
+  background: rgba(13, 27, 30, 0.8);
+  border-radius: 999px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.player-timeline::-webkit-scrollbar {
+  display: none;
+}
+.pt-seg {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pt-arrow {
+  color: #6b8a8f;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.pt-wrap {
+  position: relative;
+}
+.pt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: #cdeef0;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.75;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pt-chip.current {
+  opacity: 1;
+  color: #06231f;
+  font-weight: 700;
+}
+.pt-chip.me .pt-name {
+  text-decoration: underline;
+}
+.pt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.pt-offline {
+  font-size: 0.6rem;
+  color: #e6a15a;
+  margin-left: 2px;
+}
+/* A chip you can trade with gets a faint handshake hint and stays tappable. */
+.pt-chip.tradable {
+  cursor: pointer;
+}
+.pt-chip .pt-trade {
+  font-size: 0.66rem;
+  opacity: 0.75;
+  margin-left: 1px;
+}
+.pt-chip:disabled {
+  cursor: default;
+}
 
 .player-menu button {
   background: transparent;

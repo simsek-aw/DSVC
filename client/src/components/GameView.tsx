@@ -141,7 +141,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logExpanded, setLogExpanded] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
-  const [playerMenuId, setPlayerMenuId] = useState<string | null>(null);
 
   const me = state.players.find((p) => p.id === myPlayerId);
   const currentPlayerId = state.turnOrder[state.currentPlayerIndex];
@@ -608,29 +607,44 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <div className={`turn-banner ${bannerIsYou ? "you" : ""}`}>
             <span>{bannerStatus}</span>
           </div>
-          {(state.phase === "mainGame" || state.phase === "setup") && state.turnOrder.length > 0 && (
-            <div className="turn-order-strip" title="Zugreihenfolge">
-              {state.turnOrder.map((pid, i) => {
-                const p = state.players.find((pl) => pl.id === pid);
+        </div>
+
+        {/* Combined turn-order timeline + player list: shows the play order with
+            the active player highlighted, and each chip is tappable to trade.
+            Sits centred at the bottom of the map, between dice and recenter. */}
+        {state.phase !== "lobby" && (
+          <div className="player-timeline">
+            {(state.turnOrder.length ? state.turnOrder.map((id) => state.players.find((p) => p.id === id)) : state.players).map(
+              (p, i) => {
                 if (!p) return null;
-                const isCurrent = i === state.currentPlayerIndex;
+                const isCurrent =
+                  (state.phase === "mainGame" || state.phase === "setup") &&
+                  state.turnOrder[state.currentPlayerIndex] === p.id;
+                const isMe = p.id === myPlayerId;
+                const canTrade = !isMe && state.phase === "mainGame" && !state.negotiation;
                 return (
-                  <div key={pid} className="turn-order-seg">
-                    {i > 0 && <span className="turn-order-arrow">›</span>}
-                    <span
-                      className={`turn-order-chip ${isCurrent ? "current" : ""} ${pid === myPlayerId ? "me" : ""}`}
+                  <div key={p.id} className="pt-seg">
+                    {i > 0 && <span className="pt-arrow">›</span>}
+                    <button
+                      className={`pt-chip ${isCurrent ? "current" : ""} ${isMe ? "me" : ""} ${canTrade ? "tradable" : ""}`}
                       style={{ borderColor: p.color, background: isCurrent ? p.color : undefined }}
-                      title={p.name}
+                      disabled={isMe}
+                      onClick={() => canTrade && sendAction({ type: "startNegotiation", withPlayerId: p.id })}
+                      title={isMe ? p.name : canTrade ? `Mit ${p.name} traden` : p.name}
                     >
-                      <span className="turn-order-dot" style={{ background: p.color }} />
-                      <span className="turn-order-name">{p.name}</span>
-                    </span>
+                      <span className="pt-dot" style={{ background: p.color }} />
+                      <span className="pt-name">{p.name}</span>
+                      {state.longestRoadPlayerId === p.id && <span title="Längste Straße">🛣️</span>}
+                      {state.largestArmyPlayerId === p.id && <span title="Größte Rittermacht">⚔️</span>}
+                      {canTrade && <span className="pt-trade" aria-hidden="true">🤝</span>}
+                      {!p.connected && <span className="pt-offline">offline</span>}
+                    </button>
                   </div>
                 );
-              })}
-            </div>
-          )}
-        </div>
+              },
+            )}
+          </div>
+        )}
         {state.weather && (
           <button
             className="weather-banner"
@@ -686,36 +700,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
 
       <div className="sidebar">
         <div className="sidebar-scroll">
-        <div className="player-cards">
-          {state.players.map((p) => (
-            <div key={p.id} className="player-card-wrap">
-              <button
-                className={`player-card ${p.id === currentPlayerId ? "active" : ""}`}
-                style={{ borderColor: p.color }}
-                onClick={() => setPlayerMenuId(playerMenuId === p.id ? null : p.id)}
-              >
-                <span className="player-dot" style={{ background: p.color }} />
-                <span className="player-name">{p.name}</span>
-                {state.longestRoadPlayerId === p.id && <span className="badge" title="Längste Straße">🛣️</span>}
-                {state.largestArmyPlayerId === p.id && <span className="badge" title="Größte Rittermacht">⚔️</span>}
-                {!p.connected && <span className="offline-badge">offline</span>}
-              </button>
-              {playerMenuId === p.id && p.id !== myPlayerId && (
-                <div className="player-menu">
-                  <button
-                    disabled={!!state.negotiation}
-                    onClick={() => {
-                      sendAction({ type: "startNegotiation", withPlayerId: p.id });
-                      setPlayerMenuId(null);
-                    }}
-                  >
-                    🤝 Traden
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        {/* Player list + turn order moved onto the map (bottom-centre). */}
 
         {/* Score + remaining pieces, all on one compact line (only you see it).
             The turn/status text now lives in the top banner instead of here. */}

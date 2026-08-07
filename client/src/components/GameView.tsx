@@ -230,6 +230,15 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     setFreeRoadEdges([]);
   };
 
+  // Safety net: never leave a build/aim mode (and its hint) hanging once it's
+  // no longer my turn.
+  useEffect(() => {
+    if (!isMyTurn) {
+      setBuildMode(null);
+      setFreeRoadEdges([]);
+    }
+  }, [isMyTurn]);
+
   const onSelectFreeRoadEdge = (edge: EdgeId) => {
     setFreeRoadEdges((prev) => (prev.length >= 2 ? prev : [...prev, edge]));
   };
@@ -696,6 +705,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           freeRoadEdges={buildMode === "roadBuilding" ? freeRoadEdges : undefined}
           onSelectFreeRoadEdge={onSelectFreeRoadEdge}
           onInspect={setMapInfo}
+          onAimResolved={exitBuildMode}
           boardRef={boardApiRef}
         />
         {mapInfo && (

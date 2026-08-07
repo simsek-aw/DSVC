@@ -31,6 +31,7 @@ interface Props {
   freeRoadEdges?: EdgeId[];
   onSelectFreeRoadEdge?: (edge: EdgeId) => void;
   onInspect?: (info: MapInfo | null) => void;
+  onAimResolved?: () => void; // clear the build mode after a card/robber aim is fired
   boardRef?: React.MutableRefObject<BoardApi | null>;
 }
 
@@ -96,6 +97,7 @@ export function HexBoard({
   freeRoadEdges,
   onSelectFreeRoadEdge,
   onInspect,
+  onAimResolved,
   boardRef,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -225,10 +227,13 @@ export function HexBoard({
       sendAction({ type: "moveClassicRobber", coord: tile.coord });
     } else if (buildMode === "knight") {
       sendAction({ type: "playKnight", coord: tile.coord });
+      onAimResolved?.();
     } else if (buildMode === "bribery" && tile.revealed) {
       sendAction({ type: "playBribery", coord: tile.coord });
+      onAimResolved?.();
     } else if (buildMode === "scout" && !tile.revealed) {
       sendAction({ type: "scoutTile", coord: tile.coord });
+      onAimResolved?.();
     }
   };
 

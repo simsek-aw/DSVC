@@ -144,10 +144,11 @@ export const SECRET_OBJECTIVES: Record<SecretObjectiveId, SecretObjective> = {
 export interface GameSettings {
   secretObjectives: boolean; // deal each player a hidden mission worth extra VP
   specialBuildings: boolean; // reserved for the special-buildings layer
+  knightForcesDiscard: boolean; // house rule: playing a knight also forces the >7 discard
 }
 
 export function defaultSettings(): GameSettings {
-  return { secretObjectives: false, specialBuildings: false };
+  return { secretObjectives: false, specialBuildings: false, knightForcesDiscard: false };
 }
 
 export type GamePhase =

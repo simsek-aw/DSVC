@@ -86,6 +86,18 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
             <span className="hint">Leuchtturm oder Späherturm — mit Effekt, aber nur EINER pro Spieler und keine Siegpunkte.</span>
           </span>
         </label>
+        <label className={`room-toggle ${!isHost ? "readonly" : ""}`}>
+          <input
+            type="checkbox"
+            checked={state.settings.knightForcesDiscard}
+            disabled={!isHost}
+            onChange={(e) => sendAction({ type: "setRoomSettings", settings: { knightForcesDiscard: e.target.checked } })}
+          />
+          <span className="room-toggle-text">
+            <strong>⚔️ Ritter erzwingt Abwerfen</strong>
+            <span className="hint">Hausregel: Auch beim Ausspielen eines Ritters wirft jeder mit mehr als 7 Karten die Hälfte ab (sonst nur bei einer gewürfelten 7).</span>
+          </span>
+        </label>
       </div>
 
       {isHost ? (

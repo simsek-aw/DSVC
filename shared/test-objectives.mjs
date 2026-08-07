@@ -131,3 +131,41 @@ import { SPECIAL_BUILDINGS, bestBankRatio, buildBoardGraph, tilesTouchingVertex,
 }
 
 console.log("special buildings: all passed");
+
+// --- House rule: knight forces the >7 discard (off by default). ---
+{
+  const setup = (on) => {
+    let s = createLobby("KN1");
+    s = addPlayer(s, "A", "Anna");
+    s = addPlayer(s, "B", "Ben");
+    if (on) s = applyAction(s, "A", { type: "setRoomSettings", settings: { knightForcesDiscard: true } });
+    s = startGame(s);
+    s = applyAction(s, "A", { type: "rollTurnOrder" });
+    s = applyAction(s, "B", { type: "rollTurnOrder" });
+    const coord = s.tiles[0].coord;
+    return {
+      ...s,
+      phase: "mainGame",
+      currentPlayerIndex: 0,
+      turnOrder: ["A", "B"],
+      players: s.players.map((p) =>
+        p.id === "A"
+          ? { ...p, developmentCards: ["knight"], resources: { wood: 3, brick: 3, ore: 2, wheat: 0, sheep: 0 } } // 8 cards
+          : p,
+      ),
+    };
+  };
+  // Off: no discard queued.
+  {
+    let s = setup(false);
+    s = applyAction(s, "A", { type: "playKnight", coord: s.tiles[0].coord });
+    assert((s.pendingDiscards["A"] ?? 0) === 0, "ohne Hausregel wirft der Ritter kein Abwerfen aus");
+  }
+  // On: player with 8 cards must discard 4.
+  {
+    let s = setup(true);
+    s = applyAction(s, "A", { type: "playKnight", coord: s.tiles[0].coord });
+    assert(s.pendingDiscards["A"] === 4, "mit Hausregel muss der Ritter-Spieler (8 Karten) 4 abwerfen");
+  }
+}
+console.log("knight house rule: all passed");

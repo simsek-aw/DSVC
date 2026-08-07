@@ -359,6 +359,19 @@ export function handSize(player: Player): number {
   return RESOURCE_TYPES.reduce((sum, r) => sum + player.resources[r], 0);
 }
 
+// Queue the "over the hand limit → discard half" penalty for everyone holding
+// too many cards. Shared by the rolled 7 and (as a house rule) the knight.
+function applyDiscards(state: GameState): GameState {
+  const discards: Record<string, number> = {};
+  for (const p of state.players) {
+    const size = handSize(p);
+    if (size > HAND_LIMIT_ON_SEVEN) discards[p.id] = Math.floor(size / 2);
+  }
+  if (Object.keys(discards).length === 0) return state;
+  const names = state.players.filter((p) => discards[p.id]).map((p) => `${p.name} (${discards[p.id]})`);
+  return { ...state, pendingDiscards: discards, log: [...state.log, `Zu viele Karten — abwerfen: ${names.join(", ")}.`] };
+}
+
 // Flattens a player's resource counts into one card per entry, then shuffles —
 // this is the face-down hand the thief picks a position from.
 function buildShuffledHand(player: Player): ResourceType[] {
@@ -713,15 +726,7 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
         }
         next = { ...next, log: [...next.log, "7 gewürfelt! Der klassische Räuber muss bewegt werden."] };
         // Everyone over the hand limit gives up half (rounded down) first.
-        const discards: Record<string, number> = {};
-        for (const p of next.players) {
-          const size = handSize(p);
-          if (size > HAND_LIMIT_ON_SEVEN) discards[p.id] = Math.floor(size / 2);
-        }
-        if (Object.keys(discards).length > 0) {
-          const names = next.players.filter((p) => discards[p.id]).map((p) => `${p.name} (${discards[p.id]})`);
-          next = { ...next, pendingDiscards: discards, log: [...next.log, `Zu viele Karten — abwerfen: ${names.join(", ")}.`] };
-        }
+        next = applyDiscards(next);
       } else {
         next = produceResources(next, roll.total);
       }
@@ -928,6 +933,8 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       };
       // Same pick-a-victim-then-pick-a-card flow as the robber on a 7.
       next = beginSteal(next, findTile(next, target.coord), playerId);
+      // House rule: a knight also forces the >7 discard, just like a rolled 7.
+      if (state.settings.knightForcesDiscard) next = applyDiscards(next);
       next = recomputeLargestArmy(next);
       next = checkVictory(next);
       return next;

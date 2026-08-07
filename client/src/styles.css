@@ -1710,30 +1710,37 @@ body {
   margin: 0;
 }
 
-/* "You can build" badge on the Bauen button. */
+/* "You can build" signal on the Bauen button. When something is affordable the
+   button glows and gently pulses; when nothing is, it dims (but stays fully
+   clickable so you can still open the palette and look). The pulse calms down
+   the moment the palette is open. */
 .build-toggle {
   position: relative;
 }
-.can-build-badge {
+.build-toggle.can-build {
+  border-color: #f4d35e;
+  color: #ffe9a8;
+  animation: can-build-pulse 1.7s ease-in-out infinite;
+}
+.build-toggle.dimmed {
+  opacity: 0.5;
+}
+.can-build-dot {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
+  top: 6px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: #f4d35e;
-  color: #0d1b1e;
-  font-size: 0.72rem;
-  font-weight: 800;
-  line-height: 18px;
-  text-align: center;
-  box-shadow: 0 0 0 2px #10242a;
-  animation: can-build-pulse 1.6s ease-in-out infinite;
+  box-shadow: 0 0 6px 1px rgba(244, 211, 94, 0.8);
 }
 @keyframes can-build-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 211, 94, 0); }
+  50% { box-shadow: 0 0 10px 1px rgba(244, 211, 94, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .build-toggle.can-build { animation: none; box-shadow: 0 0 8px 1px rgba(244, 211, 94, 0.4); }
 }
 
 /* Invite banner in the lobby when opened from a share link. */

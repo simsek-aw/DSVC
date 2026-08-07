@@ -1028,15 +1028,18 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
               {showBuild && !confirmingBuyCard && buildPalette}
               <div className="bottom-actions">
                 <button
-                  className={`build-toggle ${showBuild ? "toggle-active" : ""}`}
+                  className={`build-toggle ${
+                    showBuild ? "toggle-active" : affordableBuildCount > 0 ? "can-build" : "dimmed"
+                  }`}
                   onClick={() => setShowBuild((v) => !v)}
+                  title={
+                    affordableBuildCount > 0
+                      ? "Du kannst gerade etwas bauen"
+                      : "Für einen Bau fehlen dir noch Rohstoffe — antippen zum Anschauen"
+                  }
                 >
                   🔨 Bauen
-                  {affordableBuildCount > 0 && (
-                    <span className="can-build-badge" title="So viele Bauten kannst du dir gerade leisten">
-                      {affordableBuildCount}
-                    </span>
-                  )}
+                  {!showBuild && affordableBuildCount > 0 && <span className="can-build-dot" aria-hidden="true" />}
                 </button>
                 <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
                   🃏 Karten ({me?.developmentCards.length ?? 0})

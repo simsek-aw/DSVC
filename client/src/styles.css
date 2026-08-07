@@ -1912,19 +1912,36 @@ body {
   50% { opacity: 0.62; }
 }
 
-/* One-shot flash on every tile that just produced. */
+/* Harvest highlight: every tile that just produced flares gold and pulses twice,
+   so the whole table can see at a glance which fields the roll paid out. */
 .harvest-pulse {
-  fill: #fff;
-  stroke: #fff8c4;
-  stroke-width: 3;
+  fill: #ffe27a;
+  stroke: #ffd23f;
+  stroke-width: 4;
   transform-box: fill-box;
   transform-origin: center;
-  animation: harvest-flash 0.75s ease-out forwards;
+  animation: harvest-flash 1.3s ease-out forwards;
 }
 
 @keyframes harvest-flash {
-  0% { opacity: 0.75; }
-  100% { opacity: 0; }
+  0% { opacity: 0; transform: scale(0.9); }
+  12% { opacity: 0.7; transform: scale(1.04); }
+  32% { opacity: 0.2; transform: scale(1); }
+  52% { opacity: 0.6; transform: scale(1.03); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* The number token on a producing tile gives a quick confirming bounce. */
+.harvest-bump {
+  transform-box: fill-box;
+  animation: harvest-bump 0.9s cubic-bezier(0.34, 1.56, 0.5, 1) both;
+}
+
+@keyframes harvest-bump {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.32); }
+  55% { transform: scale(0.96); }
+  100% { transform: scale(1); }
 }
 
 /* A hidden tile flipping face-up when a settlement (or the setup) uncovers it. */

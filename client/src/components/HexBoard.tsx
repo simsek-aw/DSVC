@@ -1187,8 +1187,9 @@ function TilePiece({
       )}
       {tile.revealed && tile.numberRevealed && tile.numberToken !== null && (
         <g
-          className={justNumbered ? "number-drop" : undefined}
-          style={justNumbered ? { transformOrigin: `${center.x}px ${center.y}px` } : undefined}
+          key={harvesting ? `bump-${harvestKey}` : "chip"}
+          className={[justNumbered ? "number-drop" : "", harvesting ? "harvest-bump" : ""].filter(Boolean).join(" ") || undefined}
+          style={justNumbered || harvesting ? { transformOrigin: `${center.x}px ${center.y}px` } : undefined}
         >
           <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
         </g>

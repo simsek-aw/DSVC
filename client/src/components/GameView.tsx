@@ -466,6 +466,51 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     ];
   };
 
+  // When a deal closes, the cards visibly change hands: received resources fly
+  // in from a hub above the board into their chips, given resources fly out to
+  // the same hub. Reuses the harvest flight sprite; capped so a big swap doesn't
+  // bury the board in sprites.
+  const spawnTradeFlights = (
+    gains: { resource: ResourceType; amount: number }[],
+    losses: { resource: ResourceType; amount: number }[],
+  ): Flight[] => {
+    const hubX = window.innerWidth / 2;
+    const hubY = Math.max(64, window.innerHeight * 0.12);
+    const out: Flight[] = [];
+    const jitter = (i: number) => (i - 1) * 16;
+    for (const g of gains) {
+      const chip = chipRefs.current[g.resource]?.getBoundingClientRect();
+      if (!chip) continue;
+      const n = Math.min(g.amount, 3);
+      for (let i = 0; i < n; i++) {
+        out.push({
+          id: `${Date.now()}-tin-${g.resource}-${i}-${Math.random()}`,
+          resource: g.resource,
+          x0: hubX + jitter(i),
+          y0: hubY,
+          x1: chip.x + chip.width / 2,
+          y1: chip.y + chip.height / 2,
+        });
+      }
+    }
+    for (const l of losses) {
+      const chip = chipRefs.current[l.resource]?.getBoundingClientRect();
+      if (!chip) continue;
+      const n = Math.min(l.amount, 3);
+      for (let i = 0; i < n; i++) {
+        out.push({
+          id: `${Date.now()}-tout-${l.resource}-${i}-${Math.random()}`,
+          resource: l.resource,
+          x0: chip.x + chip.width / 2,
+          y0: chip.y + chip.height / 2,
+          x1: hubX + jitter(i),
+          y1: hubY,
+        });
+      }
+    }
+    return out;
+  };
+
   // Resource gains: a floating "+N" per resource that increased. When the gain
   // comes from dice production, a sprite first flies out of each producing tile
   // into the matching resource, and the "+N" only pops once it lands.
@@ -476,9 +521,11 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     if (!prev) return;
 
     const newGains: { id: string; resource: ResourceType; amount: number }[] = [];
+    const newLosses: { resource: ResourceType; amount: number }[] = [];
     for (const r of RESOURCE_TYPES) {
       const diff = me.resources[r] - (prev[r] ?? 0);
       if (diff > 0) newGains.push({ id: `${Date.now()}-${r}-${Math.random()}`, resource: r, amount: diff });
+      else if (diff < 0) newLosses.push({ resource: r, amount: -diff });
     }
     // Pure losses/no-ops: reflect the new counts right away, nothing to animate.
     if (newGains.length === 0) {
@@ -501,16 +548,21 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     const roll = state.lastDiceRoll;
     const rollKey = roll ? `${roll.die1}-${roll.die2}-${state.currentPlayerIndex}` : "";
     const isProduction = !!roll && roll.total !== 7 && rollKey !== prodRollRef.current;
+    // A trade (bank or negotiated) is the only thing that both adds and removes
+    // resources in one update — fly the received cards in and the given ones out.
+    const isTrade = !justStole && !isProduction && newLosses.length > 0;
     const spawned = justStole
       ? spawnStealFlight(newGains[0].resource)
       : isProduction
       ? spawnHarvestFlights(roll!.total)
+      : isTrade
+      ? spawnTradeFlights(newGains, newLosses)
       : state.phase === "setup"
       ? spawnSetupFlights()
       : [];
 
     if (spawned.length > 0) {
-      prodRollRef.current = rollKey;
+      if (isProduction) prodRollRef.current = rollKey;
       setFlights((f) => [...f, ...spawned]);
       spawned.forEach((fl) => setTimeout(() => setFlights((cur) => cur.filter((x) => x.id !== fl.id)), FLIGHT_MS + 60));
       // The "+N" and the higher deck count both land WITH the sprite, so the

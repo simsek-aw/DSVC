@@ -136,6 +136,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [tradeReceive, setTradeReceive] = useState<Partial<Record<ResourceType, number>>>({});
   const [showTradePanel, setShowTradePanel] = useState(false);
   const [showCards, setShowCards] = useState(false);
+  const [showBuild, setShowBuild] = useState(false);
   const [confirmingBuyCard, setConfirmingBuyCard] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logExpanded, setLogExpanded] = useState(false);
@@ -154,6 +155,23 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     city: PIECE_LIMITS.city - state.buildings.filter((b) => b.ownerId === myPlayerId && b.type === "city").length,
     road: PIECE_LIMITS.road - state.roads.filter((r) => r.ownerId === myPlayerId).length,
   };
+
+  // How many distinct builds my current resources (and remaining pieces) allow
+  // right now — drives the little "you can build" badge on the Bauen button.
+  // Purely resource/stock based, as requested: it doesn't check for a legal spot.
+  const affordableBuildCount = !me
+    ? 0
+    : [
+        canAfford(me.resources, BUILD_COSTS.road) && myPieces.road > 0,
+        canAfford(me.resources, BUILD_COSTS.settlement) && myPieces.settlement > 0,
+        canAfford(me.resources, BUILD_COSTS.city) &&
+          myPieces.city > 0 &&
+          state.buildings.some((b) => b.ownerId === myPlayerId && b.type === "settlement"),
+        canAfford(me.resources, BUILD_COSTS.developmentCard),
+        ...(state.settings.specialBuildings && !state.players.some((p) => p.id === myPlayerId && p.specialBuildings.length > 0)
+          ? Object.values(SPECIAL_BUILDINGS).map((s) => canAfford(me.resources, s.cost))
+          : []),
+      ].filter(Boolean).length;
 
   // What the game is waiting for right now, phrased as a short prompt.
   const currentConnected = currentPlayer?.connected ?? true;
@@ -469,6 +487,36 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   // Only players actually holding the wanted resource get asked to help out.
   const canAnswerRequest = !!request && !iAmRequester && !!me && me.resources[request.resource] > 0 && !state.pendingTrade;
 
+  // The build palette, unfolded above the action row when "Bauen" is toggled.
+  const buildPalette = (
+    <div className={`build-bar ${state.settings.specialBuildings ? "has-more" : ""}`}>
+      <BuildTile icon="🛤️" label="Straße" cost={BUILD_COSTS.road} resources={me?.resources} active={buildMode === "road"} onClick={() => setBuildMode(buildMode === "road" ? null : "road")} />
+      <BuildTile icon="🏠" label="Siedlung" cost={BUILD_COSTS.settlement} resources={me?.resources} active={buildMode === "settlement"} onClick={() => setBuildMode(buildMode === "settlement" ? null : "settlement")} />
+      <BuildTile icon="🏙️" label="Stadt" cost={BUILD_COSTS.city} resources={me?.resources} active={buildMode === "city"} onClick={() => setBuildMode(buildMode === "city" ? null : "city")} />
+      <BuildTile icon="🃏" label="Entwicklung" cost={BUILD_COSTS.developmentCard} resources={me?.resources} active={false} onClick={() => setConfirmingBuyCard(true)} />
+      <BuildTile icon="🔭" label="Spähen" cost={SCOUT_COST} resources={me?.resources} active={buildMode === "scout"} onClick={() => setBuildMode(buildMode === "scout" ? null : "scout")} />
+      {state.settings.specialBuildings &&
+        Object.values(SPECIAL_BUILDINGS).map((spec) => {
+          const isBuilt = me?.specialBuildings.some((s) => s.id === spec.id) ?? false;
+          const usedOne = (me?.specialBuildings.length ?? 0) > 0;
+          return (
+            <BuildTile
+              key={spec.id}
+              icon={spec.icon}
+              label={spec.title}
+              title={`${spec.title} — ${spec.desc}`}
+              cost={spec.cost}
+              resources={me?.resources}
+              active={buildMode === spec.id}
+              built={isBuilt}
+              locked={usedOne && !isBuilt}
+              onClick={() => setBuildMode(buildMode === spec.id ? null : (spec.id as SpecialBuildingId))}
+            />
+          );
+        })}
+    </div>
+  );
+
   return (
     <div className="game-root">
       {flights.map((f) => (
@@ -603,6 +651,21 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             )}
           </div>
         )}
+
+        {/* Dice live in the bottom-left corner of the map: a roll button before
+            you roll, then this turn's result badge afterwards. */}
+        {state.phase === "mainGame" && isMyTurn && !state.lastDiceRoll && (
+          <div className="map-dice">
+            <DiceRoller serverRoll={null} onRoll={() => sendAction({ type: "rollDice" })} compact />
+          </div>
+        )}
+        {state.phase === "mainGame" && state.lastDiceRoll && (
+          <div className="map-dice map-dice-result" title={`Wurf dieser Runde: ${state.lastDiceRoll.total}`}>
+            <PixelDie value={state.lastDiceRoll.die1} size={16} />
+            <PixelDie value={state.lastDiceRoll.die2} size={16} />
+            <span className="dice-result-total">{state.lastDiceRoll.total}</span>
+          </div>
+        )}
       </div>
 
       <div className="sidebar">
@@ -688,70 +751,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <p className="hint setup-note">
             Schlangenreihenfolge: Runde 2 läuft rückwärts — wer zuletzt gelegt hat, ist direkt nochmal dran.
           </p>
-        )}
-
-        {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && !confirmingBuyCard && (
-          <div className={`build-bar ${state.settings.specialBuildings ? "has-more" : ""}`}>
-            <BuildTile
-              icon="🛤️"
-              label="Straße"
-              cost={BUILD_COSTS.road}
-              resources={me?.resources}
-              active={buildMode === "road"}
-              onClick={() => setBuildMode(buildMode === "road" ? null : "road")}
-            />
-            <BuildTile
-              icon="🏠"
-              label="Siedlung"
-              cost={BUILD_COSTS.settlement}
-              resources={me?.resources}
-              active={buildMode === "settlement"}
-              onClick={() => setBuildMode(buildMode === "settlement" ? null : "settlement")}
-            />
-            <BuildTile
-              icon="🏙️"
-              label="Stadt"
-              cost={BUILD_COSTS.city}
-              resources={me?.resources}
-              active={buildMode === "city"}
-              onClick={() => setBuildMode(buildMode === "city" ? null : "city")}
-            />
-            <BuildTile
-              icon="🃏"
-              label="Entwicklung"
-              cost={BUILD_COSTS.developmentCard}
-              resources={me?.resources}
-              active={false}
-              onClick={() => setConfirmingBuyCard(true)}
-            />
-            <BuildTile
-              icon="🔭"
-              label="Spähen"
-              cost={SCOUT_COST}
-              resources={me?.resources}
-              active={buildMode === "scout"}
-              onClick={() => setBuildMode(buildMode === "scout" ? null : "scout")}
-            />
-            {state.settings.specialBuildings &&
-              Object.values(SPECIAL_BUILDINGS).map((spec) => {
-                const isBuilt = me?.specialBuildings.some((s) => s.id === spec.id) ?? false;
-                const usedOne = (me?.specialBuildings.length ?? 0) > 0;
-                return (
-                  <BuildTile
-                    key={spec.id}
-                    icon={spec.icon}
-                    label={spec.title}
-                    title={`${spec.title} — ${spec.desc}`}
-                    cost={spec.cost}
-                    resources={me?.resources}
-                    active={buildMode === spec.id}
-                    built={isBuilt}
-                    locked={usedOne && !isBuilt}
-                    onClick={() => setBuildMode(buildMode === spec.id ? null : (spec.id as SpecialBuildingId))}
-                  />
-                );
-              })}
-          </div>
         )}
 
         {confirmingBuyCard && (
@@ -857,11 +856,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {state.phase === "mainGame" && isMyTurn && !state.lastDiceRoll && (
-          <div className="action-bar">
-            <DiceRoller serverRoll={null} onRoll={() => sendAction({ type: "rollDice" })} />
-          </div>
-        )}
+        {/* The per-turn roll now lives on the map (bottom-left), not here. */}
 
         {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll?.total === 7 && !state.robberTileCoord && (
           <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>
@@ -1028,25 +1023,32 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         )}
 
           {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && (
-            <div className="bottom-actions">
-              <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
-                🃏 Karten ({me?.developmentCards.length ?? 0})
-              </button>
-              <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
-                🔁 Handel
-              </button>
-              <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
-                Zug beenden
-              </button>
-              {/* Keeps this turn's roll on screen instead of the dice vanishing. */}
-              <div className="dice-result-tile" title="Dein Wurf in dieser Runde">
-                <span className="dice-result-faces">
-                  <PixelDie value={state.lastDiceRoll.die1} size={18} />
-                  <PixelDie value={state.lastDiceRoll.die2} size={18} />
-                </span>
-                <span className="dice-result-total">{state.lastDiceRoll.total}</span>
+            <>
+              {/* Build palette unfolds directly above the action row. */}
+              {showBuild && !confirmingBuyCard && buildPalette}
+              <div className="bottom-actions">
+                <button
+                  className={`build-toggle ${showBuild ? "toggle-active" : ""}`}
+                  onClick={() => setShowBuild((v) => !v)}
+                >
+                  🔨 Bauen
+                  {affordableBuildCount > 0 && (
+                    <span className="can-build-badge" title="So viele Bauten kannst du dir gerade leisten">
+                      {affordableBuildCount}
+                    </span>
+                  )}
+                </button>
+                <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
+                  🃏 Karten ({me?.developmentCards.length ?? 0})
+                </button>
+                <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
+                  🔁 Handel
+                </button>
+                <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
+                  Zug beenden
+                </button>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -1059,10 +1061,12 @@ function DiceRoller({
   serverRoll,
   onRoll,
   keepResult = false,
+  compact = false,
 }: {
   serverRoll: { die1: number; die2: number; total: number } | null;
   onRoll: () => void;
   keepResult?: boolean;
+  compact?: boolean;
 }) {
   const [rolling, setRolling] = useState(false);
   const [display, setDisplay] = useState<[number, number]>([1, 1]);
@@ -1124,7 +1128,7 @@ function DiceRoller({
 
   return (
     <div
-      className={`dice-roller ${rolling ? "rolling" : ""}`}
+      className={`dice-roller ${rolling ? "rolling" : ""} ${compact ? "compact" : ""}`}
       style={{ touchAction: "none" }}
       role="button"
       tabIndex={0}
@@ -1134,9 +1138,9 @@ function DiceRoller({
         if (e.key === "Enter" || e.key === " ") triggerRoll();
       }}
     >
-      <PixelDie value={display[0]} size={30} />
-      <PixelDie value={display[1]} size={30} />
-      <span className="dice-hint">{rolling ? "…" : "Drücken zum Würfeln"}</span>
+      <PixelDie value={display[0]} size={compact ? 20 : 30} />
+      <PixelDie value={display[1]} size={compact ? 20 : 30} />
+      <span className="dice-hint">{rolling ? "…" : compact ? "Würfeln" : "Drücken zum Würfeln"}</span>
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   SECRET_OBJECTIVES,
   SPECIAL_BUILDINGS,
   SpecialBuildingId,
+  REACTION_EMOJIS,
 } from "@canos/shared";
 import { HexBoard, BuildMode, MapInfo, BoardApi } from "./HexBoard";
 import { NegotiationTable } from "./NegotiationTable";
@@ -267,6 +268,24 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const notifiedRef = useRef(false);
   const logSeenRef = useRef(state.log.length);
   const prodRollRef = useRef<string>("");
+
+  // Emoji reactions: the engine keeps a short, monotonic tail; we float each new
+  // one over the sender's chip exactly once, then drop it after the animation.
+  const [showReactions, setShowReactions] = useState(false);
+  const [floatingReactions, setFloatingReactions] = useState<{ key: number; playerId: string; emoji: string }[]>([]);
+  const reactionSeenRef = useRef(state.reactionSeq);
+  useEffect(() => {
+    const seen = reactionSeenRef.current;
+    reactionSeenRef.current = state.reactionSeq;
+    const fresh = state.reactions.filter((r) => r.id > seen);
+    if (!fresh.length) return;
+    const added = fresh.map((r) => ({ key: r.id, playerId: r.playerId, emoji: r.emoji }));
+    setFloatingReactions((cur) => [...cur, ...added]);
+    const timers = added.map((a) =>
+      setTimeout(() => setFloatingReactions((cur) => cur.filter((x) => x.key !== a.key)), 2200)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [state.reactions, state.reactionSeq]);
 
   // Big plays (knight, monopoly, longest road, …) get the same popup treatment
   // as a dice roll. The engine tags those log lines with a leading emoji, so a
@@ -844,11 +863,43 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                       {vpPeek && vpPeek.id === p.id && (
                         <span className="pt-vp-peek">🏆 {vpPeek.vp}</span>
                       )}
+                      {floatingReactions
+                        .filter((r) => r.playerId === p.id)
+                        .map((r) => (
+                          <span key={r.key} className="pt-reaction" aria-hidden="true">
+                            {r.emoji}
+                          </span>
+                        ))}
                     </button>
                   </div>
                 );
               },
             )}
+          </div>
+        )}
+        {state.phase === "mainGame" && (
+          <div className={`reaction-bar ${showReactions ? "open" : ""}`}>
+            {showReactions &&
+              REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  className="reaction-emoji"
+                  onClick={() => {
+                    sendAction({ type: "sendReaction", emoji });
+                    setShowReactions(false);
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            <button
+              className="reaction-toggle"
+              onClick={() => setShowReactions((v) => !v)}
+              aria-label="Reaktion senden"
+              title="Reaktion senden"
+            >
+              {showReactions ? "✕" : "😊"}
+            </button>
           </div>
         )}
         {!tradeHintSeen && someTradable && (

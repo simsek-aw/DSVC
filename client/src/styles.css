@@ -1278,6 +1278,7 @@ body {
   position: relative;
 }
 .pt-chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2470,4 +2471,65 @@ body {
   background: #2a9d8f;
   border-color: #2a9d8f;
   color: #06231f;
+}
+
+/* ── Emoji reactions ──────────────────────────────────────────────────── */
+/* A freshly-fired reaction floats up out of the sender's chip and fades. */
+.pt-reaction {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  font-size: 1.15rem;
+  pointer-events: none;
+  animation: reaction-float 2.1s ease-out forwards;
+}
+
+@keyframes reaction-float {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.4); }
+  18% { opacity: 1; transform: translate(-50%, -6px) scale(1.2); }
+  40% { transform: translate(-50%, -16px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(0.9); }
+}
+
+/* The reaction control sits bottom-right of the map, opposite the dice. */
+.reaction-bar {
+  position: absolute;
+  right: 10px;
+  bottom: 52px;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-direction: row-reverse;
+}
+
+.reaction-toggle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid #2a4a4f;
+  background: rgba(16, 36, 42, 0.9);
+  color: #fff;
+  font-size: 1.15rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.reaction-emoji {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #2a4a4f;
+  background: rgba(16, 36, 42, 0.9);
+  font-size: 1.05rem;
+  cursor: pointer;
+  padding: 0;
+  animation: build-pop 0.24s cubic-bezier(0.34, 1.56, 0.5, 1) both;
+}
+
+.reaction-emoji:active {
+  transform: scale(0.88);
 }

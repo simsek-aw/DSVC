@@ -210,6 +210,19 @@ export interface WeatherEvent {
 
 export const EVENT_EVERY_ROUNDS = 3;
 
+/** A transient emoji reaction a player fires; the client floats it briefly over
+ * the sender's chip and then forgets it. Kept only as a short recent tail in
+ * game state (no clock in the pure engine), each with a monotonic id so a
+ * client shows every reaction exactly once. */
+export interface Reaction {
+  id: number;
+  playerId: string;
+  emoji: string;
+}
+
+/** Emoji a player may fire as a quick reaction. Kept short and unambiguous. */
+export const REACTION_EMOJIS = ["👍", "😂", "😮", "😡", "🎉", "🤝", "🎲", "🔥"] as const;
+
 export interface Negotiation {
   id: string;
   initiatorId: string;
@@ -256,6 +269,10 @@ export interface GameState {
   roundCount: number;
   weather: WeatherEvent | null;
   settings: GameSettings;
+  // Recent emoji reactions (capped tail) plus a monotonic counter so every
+  // reaction is shown exactly once on each client, even after the tail is pruned.
+  reactions: Reaction[];
+  reactionSeq: number;
   log: string[];
 }
 
@@ -311,6 +328,7 @@ export type ClientAction =
   | { type: "discardResources"; resources: Partial<Record<ResourceType, number>> }
   | { type: "chooseStealVictim"; victimId: string }
   | { type: "sendChat"; text: string }
+  | { type: "sendReaction"; emoji: string }
   | { type: "shuffleStealHand" }
   | { type: "reorderStealHand"; from: number; to: number }
   | { type: "stealCard"; index: number }

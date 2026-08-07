@@ -33,6 +33,7 @@ export type {
   Negotiation,
   WeatherKind,
   WeatherEvent,
+  Reaction,
   PendingSteal,
   GameState,
   ClientAction,
@@ -62,6 +63,7 @@ export {
   SECRET_OBJECTIVES,
   SPECIAL_BUILDINGS,
   SPECIAL_BUILDING_LIMIT,
+  REACTION_EMOJIS,
   defaultSettings,
 } from "./types";
 

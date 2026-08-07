@@ -21,6 +21,7 @@ import {
   LONGEST_ROAD_MIN_LENGTH,
   PIECE_LIMITS,
   Player,
+  REACTION_EMOJIS,
   ResourceType,
   HAND_LIMIT_ON_SEVEN,
   RESOURCE_TYPES,
@@ -99,6 +100,8 @@ export function createLobby(roomId: string): GameState {
     roundCount: 0,
     weather: null,
     settings: defaultSettings(),
+    reactions: [],
+    reactionSeq: 0,
     log: [],
   };
 }
@@ -788,6 +791,17 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       const text = action.text.trim().slice(0, CHAT_MAX_LENGTH);
       if (!text) throw new GameError("Leere Nachricht.");
       return { ...state, log: [...state.log, `${CHAT_PREFIX}${player.name}: ${text}`] };
+    }
+
+    case "sendReaction": {
+      const player = state.players.find((p) => p.id === playerId);
+      if (!player) throw new GameError("Spieler nicht gefunden.");
+      if (!REACTION_EMOJIS.includes(action.emoji as (typeof REACTION_EMOJIS)[number])) {
+        throw new GameError("Unbekannte Reaktion.");
+      }
+      const id = state.reactionSeq + 1;
+      const reactions = [...state.reactions, { id, playerId, emoji: action.emoji }].slice(-12);
+      return { ...state, reactions, reactionSeq: id };
     }
 
     case "shuffleStealHand": {

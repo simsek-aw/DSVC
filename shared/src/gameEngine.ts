@@ -655,10 +655,10 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       next = revealTilesTouching(next, action.vertex, playerId, false); // no treasures during setup
       next = updatePlayer(next, playerId, (p) => ({ ...p, victoryPoints: p.victoryPoints + 1 }));
 
-      // Second settlement of setup grants immediate starting resources (classic
-      // Catan rule): one of each resource the settlement's tiles produce — a
-      // boosted tile yields double, matching how it pays out on every later roll.
-      if (state.setupRound === 2) {
+      // House rule: BOTH starting settlements pay out (not just the second as in
+      // classic Catan) — one of each resource the settlement's tiles produce, a
+      // boosted tile double. So a well-centred pair can net up to ~6 cards.
+      {
         const gained: Partial<Record<ResourceType, number>> = {};
         for (const coord of tilesTouchingVertex(graph, action.vertex)) {
           const tile = findTile(next, coord);

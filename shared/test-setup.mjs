@@ -39,34 +39,36 @@ const edgeAt = (v) => {
   return null;
 };
 
-const secondSettlementVertex = {};
+const settlementVerts = {}; // player -> [v1, v2]
 for (let step = 0; step < 4; step++) {
   const who = s.turnOrder[s.currentPlayerIndex];
-  const round = s.setupRound;
   const v = freeVertex();
   s = applyAction(s, who, { type: "placeSetupSettlement", vertex: v });
-  if (round === 2) secondSettlementVertex[who] = v;
+  (settlementVerts[who] ??= []).push(v);
   s = applyAction(s, who, { type: "placeSetupRoad", edge: edgeAt(v) });
 }
 
 assert(s.phase === "mainGame", "Aufbau ist beendet, Hauptspiel läuft");
 
-for (const p of s.players) {
-  const v = secondSettlementVertex[p.id];
-  // One per adjacent non-desert tile, doubled on a boosted tile.
-  const expected = tilesTouchingVertex(g, v)
+const tilesFor = (v) =>
+  tilesTouchingVertex(g, v)
     .map((c) => s.tiles.find((t) => t.coord.q === c.q && t.coord.r === c.r))
     .filter((t) => t && t.terrain !== "desert")
     .reduce((sum, t) => sum + (t.hasBoostToken ? 2 : 1), 0);
-  assert(handSize(p) === expected, `${p.name} bekommt exakt ${expected} Startrohstoffe (hat ${handSize(p)})`);
+
+for (const p of s.players) {
+  // BOTH starting settlements pay out now, so the hand is the sum of both.
+  const expected = settlementVerts[p.id].reduce((sum, v) => sum + tilesFor(v), 0);
+  assert(handSize(p) === expected, `${p.name} bekommt exakt ${expected} Startrohstoffe (beide Siedlungen, hat ${handSize(p)})`);
 }
 
 // No treasure was collected during setup (no cache/curse/relic log lines).
 const treasureLogs = s.log.filter((l) => /Versteck|Relikt|verfluchte Ruine/.test(l));
 assert(treasureLogs.length === 0, "keine Schätze während des Aufbaus ausgelöst");
 
+// Two gift lines per player now (one per settlement).
 const gifts = s.log.filter((l) => l.startsWith("🎁"));
-assert(gifts.length === s.players.length, "jeder Spieler bekommt eine Startrohstoff-Logzeile");
+assert(gifts.length === s.players.length * 2, "jeder Spieler bekommt zwei Startrohstoff-Logzeilen (je Siedlung)");
 console.log(gifts.join("\n"));
 
 console.log("\nALLE SETUP-TESTS BESTANDEN");

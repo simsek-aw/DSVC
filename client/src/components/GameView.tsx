@@ -178,17 +178,34 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const myActionHint =
     state.phase === "mainGame" && isMyTurn
       ? state.lastDiceRoll
-        ? "Du bist dran — bauen, handeln oder Zug beenden."
+        ? "Du bist dran"
         : "Du bist dran — würfeln!"
       : state.phase === "setup" && isMyTurn
       ? state.setupStepAwaitingRoad
-        ? "Du bist dran — lege deine Straße."
-        : "Du bist dran — setze deine Siedlung."
+        ? "Du bist dran — lege deine Straße"
+        : "Du bist dran — setze deine Siedlung"
       : null;
   const waitingFor =
     !isMyTurn && (state.phase === "mainGame" || state.phase === "setup")
       ? `Wartet auf ${currentPlayer?.name ?? "…"}${currentConnected ? " …" : " (offline)"}`
       : null;
+
+  // One combined status line for the top banner — replaces the separate sidebar
+  // info box so the "whose turn / what now" text lives in a single place.
+  const winnerName = state.players.find((p) => p.id === state.winnerId)?.name ?? "Niemand";
+  const bannerStatus =
+    state.phase === "ended"
+      ? `${winnerName} hat gewonnen! 🏆`
+      : state.phase === "turnOrderRoll"
+      ? "Würfelt um die Startreihenfolge"
+      : myActionHint
+      ? myActionHint
+      : state.phase === "setup"
+      ? `Aufbau ${state.setupRound}/2 — ${currentPlayer?.name ?? "…"} ${
+          state.setupStepAwaitingRoad ? "legt eine Straße" : "legt eine Siedlung"
+        }`
+      : waitingFor ?? `Am Zug: ${currentPlayer?.name ?? "…"}`;
+  const bannerIsYou = isMyTurn && (state.phase === "mainGame" || state.phase === "setup");
 
   // My own progress — shown only to me, so opponents stay a guessing game.
   const myVP = totalVictoryPoints(state, myPlayerId);
@@ -587,39 +604,33 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             </div>
           )}
         </div>
-        <div className="turn-banner">
-          {state.phase === "setup" && (
-            <span>
-              Aufbau {state.setupRound}/2{state.setupRound === 2 ? " (rückwärts)" : ""} — {currentPlayer?.name} platziert{" "}
-              {state.setupStepAwaitingRoad ? "eine Straße" : "eine Siedlung"}
-            </span>
-          )}
-          {state.phase === "turnOrderRoll" && <span>Würfeln um die Startreihenfolge</span>}
-          {state.phase === "mainGame" && <span>Am Zug: {currentPlayer?.name}</span>}
-          {state.phase === "ended" && <span>{state.players.find((p) => p.id === state.winnerId)?.name} hat gewonnen! 🏆</span>}
-        </div>
-        {(state.phase === "mainGame" || state.phase === "setup") && state.turnOrder.length > 0 && (
-          <div className="turn-order-strip" title="Zugreihenfolge">
-            {state.turnOrder.map((pid, i) => {
-              const p = state.players.find((pl) => pl.id === pid);
-              if (!p) return null;
-              const isCurrent = i === state.currentPlayerIndex;
-              return (
-                <div key={pid} className="turn-order-seg">
-                  {i > 0 && <span className="turn-order-arrow">›</span>}
-                  <span
-                    className={`turn-order-chip ${isCurrent ? "current" : ""} ${pid === myPlayerId ? "me" : ""}`}
-                    style={{ borderColor: p.color, background: isCurrent ? p.color : undefined }}
-                    title={p.name}
-                  >
-                    <span className="turn-order-dot" style={{ background: p.color }} />
-                    <span className="turn-order-name">{p.name}</span>
-                  </span>
-                </div>
-              );
-            })}
+        <div className="top-hud">
+          <div className={`turn-banner ${bannerIsYou ? "you" : ""}`}>
+            <span>{bannerStatus}</span>
           </div>
-        )}
+          {(state.phase === "mainGame" || state.phase === "setup") && state.turnOrder.length > 0 && (
+            <div className="turn-order-strip" title="Zugreihenfolge">
+              {state.turnOrder.map((pid, i) => {
+                const p = state.players.find((pl) => pl.id === pid);
+                if (!p) return null;
+                const isCurrent = i === state.currentPlayerIndex;
+                return (
+                  <div key={pid} className="turn-order-seg">
+                    {i > 0 && <span className="turn-order-arrow">›</span>}
+                    <span
+                      className={`turn-order-chip ${isCurrent ? "current" : ""} ${pid === myPlayerId ? "me" : ""}`}
+                      style={{ borderColor: p.color, background: isCurrent ? p.color : undefined }}
+                      title={p.name}
+                    >
+                      <span className="turn-order-dot" style={{ background: p.color }} />
+                      <span className="turn-order-name">{p.name}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
         {state.weather && (
           <button
             className="weather-banner"
@@ -652,10 +663,15 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {/* Dice live in the bottom-left corner of the map: a roll button before
-            you roll, then this turn's result badge afterwards. */}
+        {/* All dice live in the bottom-left corner of the map, for both the
+            opening roll and every turn. It pulses when it's your turn to throw. */}
+        {state.phase === "turnOrderRoll" && (
+          <div className={`map-dice ${!me?.turnOrderRoll ? "can-roll" : ""}`}>
+            <DiceRoller serverRoll={me?.turnOrderRoll ?? null} onRoll={() => sendAction({ type: "rollTurnOrder" })} keepResult compact />
+          </div>
+        )}
         {state.phase === "mainGame" && isMyTurn && !state.lastDiceRoll && (
-          <div className="map-dice">
+          <div className="map-dice can-roll">
             <DiceRoller serverRoll={null} onRoll={() => sendAction({ type: "rollDice" })} compact />
           </div>
         )}
@@ -701,21 +717,27 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           ))}
         </div>
 
-        {myActionHint && <div className="action-hint you">{myActionHint}</div>}
-        {waitingFor && <div className="action-hint waiting">⏳ {waitingFor}</div>}
-
-        {/* My own score + progress toward the two bonus cards (mine only). */}
-        {state.phase === "mainGame" && (
-          <div className="my-progress" title="Nur du siehst deinen Punktestand">
-            <span className="vp-badge">🏆 {myVP}/{VICTORY_POINTS_TO_WIN}</span>
-            <span className={state.longestRoadPlayerId === myPlayerId ? "won" : ""} title="Längste Straße (ab 5)">
-              🛣️ {myRoad}
-              {state.longestRoadPlayerId === myPlayerId && " 🏅"}
-            </span>
-            <span className={state.largestArmyPlayerId === myPlayerId ? "won" : ""} title="Größte Rittermacht (ab 3)">
-              ⚔️ {myKnights}
-              {state.largestArmyPlayerId === myPlayerId && " 🏅"}
-            </span>
+        {/* Score + remaining pieces, all on one compact line (only you see it).
+            The turn/status text now lives in the top banner instead of here. */}
+        {(state.phase === "mainGame" || state.phase === "setup") && (
+          <div className="stat-row" title="Dein Punktestand & verbleibende Bauteile — nur du siehst das">
+            {state.phase === "mainGame" && (
+              <>
+                <span className="vp-badge">🏆 {myVP}/{VICTORY_POINTS_TO_WIN}</span>
+                <span className={state.longestRoadPlayerId === myPlayerId ? "won" : ""} title="Längste Straße (ab 5)">
+                  🛣️ {myRoad}
+                  {state.longestRoadPlayerId === myPlayerId && "🏅"}
+                </span>
+                <span className={state.largestArmyPlayerId === myPlayerId ? "won" : ""} title="Größte Rittermacht (ab 3)">
+                  ⚔️ {myKnights}
+                  {state.largestArmyPlayerId === myPlayerId && "🏅"}
+                </span>
+                <span className="stat-sep" aria-hidden="true">·</span>
+              </>
+            )}
+            <span className={myPieces.road === 0 ? "depleted" : ""} title="Straßen übrig">🛤️ {myPieces.road}</span>
+            <span className={myPieces.settlement === 0 ? "depleted" : ""} title="Siedlungen übrig">🏠 {myPieces.settlement}</span>
+            <span className={myPieces.city === 0 ? "depleted" : ""} title="Städte übrig">🏙️ {myPieces.city}</span>
           </div>
         )}
 
@@ -735,15 +757,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                 {SECRET_OBJECTIVES[me.objective].desc} · +{SECRET_OBJECTIVES[me.objective].bonus} versteckte SP
               </span>
             </span>
-          </div>
-        )}
-
-        {/* My remaining stock of pieces. */}
-        {(state.phase === "mainGame" || state.phase === "setup") && (
-          <div className="piece-tally" title="Deine verbleibenden Bauteile">
-            <span className={myPieces.road === 0 ? "depleted" : ""}>🛤️ {myPieces.road}</span>
-            <span className={myPieces.settlement === 0 ? "depleted" : ""}>🏠 {myPieces.settlement}</span>
-            <span className={myPieces.city === 0 ? "depleted" : ""}>🏙️ {myPieces.city}</span>
           </div>
         )}
 
@@ -849,14 +862,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {/* Same dice widget for the opening roll and for every turn. */}
-        {state.phase === "turnOrderRoll" && (
-          <div className="action-bar">
-            <DiceRoller serverRoll={me?.turnOrderRoll ?? null} onRoll={() => sendAction({ type: "rollTurnOrder" })} keepResult />
-          </div>
-        )}
-
-        {/* The per-turn roll now lives on the map (bottom-left), not here. */}
+        {/* All rolling (opening + per-turn) now happens on the map, bottom-left. */}
 
         {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll?.total === 7 && !state.robberTileCoord && (
           <p className="hint">Wähle ein Feld für den Räuber (Tippen aufs Feld)</p>

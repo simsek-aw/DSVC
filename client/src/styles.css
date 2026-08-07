@@ -272,32 +272,44 @@ body {
   opacity: 0.9;
 }
 
-.turn-banner {
+/* Banner + turn-order strip share one top-centred column so they stack neatly
+   and never overlap, however long the status text gets. */
+.top-hud {
   position: absolute;
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  /* Keep clear of the room code on the left and the burger menu on the right. */
+  max-width: calc(100% - 116px);
+  z-index: 15;
+}
+.turn-banner {
   background: rgba(13, 27, 30, 0.85);
   padding: 8px 16px;
   border-radius: 999px;
   font-size: 0.9rem;
   text-align: center;
-  /* Keep clear of the room code on the left and the burger menu on the right
-     instead of running underneath them. */
-  max-width: calc(100% - 116px);
+  max-width: 100%;
+}
+/* When it's your turn the banner leans into the accent colour so the status
+   ("Du bist dran — …") reads as a call to action, not just a label. */
+.turn-banner.you {
+  background: rgba(42, 157, 143, 0.92);
+  color: #04231f;
+  font-weight: 700;
 }
 
 /* Turn-order strip: floats just under the "Am Zug" banner and shows the whole
    snake sequence at a glance, current player filled, you get a subtle ring. */
 .turn-order-strip {
-  position: absolute;
-  top: 52px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 2px;
-  max-width: calc(100% - 24px);
+  max-width: 100%;
   padding: 4px 6px;
   background: rgba(13, 27, 30, 0.7);
   border-radius: 999px;
@@ -1709,6 +1721,14 @@ body {
   font-size: 0.72rem;
   margin: 0;
 }
+/* Pulses gold while it's your turn to throw, then calms once you've rolled. */
+.map-dice.can-roll .dice-roller.compact {
+  border-color: #f4d35e;
+  animation: can-build-pulse 1.7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-dice.can-roll .dice-roller.compact { animation: none; box-shadow: 0 0 8px 1px rgba(244, 211, 94, 0.4); }
+}
 
 /* "You can build" signal on the Bauen button. When something is affordable the
    button glows and gently pulses; when nothing is, it dims (but stays fully
@@ -1754,22 +1774,31 @@ body {
 }
 
 /* My own score + bonus-card progress (visible only to me). */
-.my-progress {
+/* Score + remaining pieces on one compact line. */
+.stat-row {
   display: flex;
-  gap: 10px;
+  gap: 9px;
   justify-content: center;
   align-items: center;
+  flex-wrap: wrap;
   font-size: 0.82rem;
   color: #cfe6df;
   padding: 2px 0;
 }
-.my-progress .vp-badge {
+.stat-row .vp-badge {
   font-weight: 700;
   color: #f4d35e;
 }
-.my-progress .won {
+.stat-row .won {
   color: #f4d35e;
   font-weight: 700;
+}
+.stat-row .stat-sep {
+  color: #3d5b60;
+}
+.stat-row .depleted {
+  color: #6b8f94;
+  text-decoration: line-through;
 }
 
 /* Secret mission card — only its owner sees it, tucked under the score row. */

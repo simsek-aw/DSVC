@@ -41,6 +41,7 @@ export type {
   SecretObjectiveId,
   SpecialBuilding,
   SpecialBuildingId,
+  SpecialBuildingPlacement,
 } from "./types";
 export {
   RESOURCE_TYPES,

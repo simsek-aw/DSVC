@@ -5,6 +5,7 @@ import {
   EdgeId,
   GameState,
   ResourceType,
+  SpecialBuildingId,
   TERRAIN_NAMES_DE,
   TILE_SIZE,
   Tile,
@@ -12,6 +13,7 @@ import {
   axialKey,
   axialToPixel,
   buildBoardGraph,
+  tilesTouchingVertex,
   edgeKey,
   hexCorners,
   vertexKey,
@@ -19,7 +21,7 @@ import {
 import { MarkerKind, MarkerSpriteAt, NumberChipAt, ResourceSpriteAt, ShipSpriteAt } from "./PixelIcons";
 import { WaterPatternTile } from "./Water";
 
-export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout";
+export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout" | "lighthouse" | "watchtower";
 
 interface Props {
   state: GameState;
@@ -331,10 +333,23 @@ export function HexBoard({
           const owner = building && state.players.find((pl) => pl.id === building.ownerId);
 
           const isMyTurn = state.turnOrder[state.currentPlayerIndex] === myPlayerId;
+          const specialMode = buildMode === "lighthouse" || buildMode === "watchtower";
+          const iHaveSpecial = state.players.some((pl) => pl.id === myPlayerId && pl.specialBuildings.length > 0);
+          const specialHere = state.players.flatMap((pl) => pl.specialBuildings).find((s) => vertexKey(s.vertex) === vk);
+          const isCoastal = tilesTouchingVertex(graph, v).length < 3;
+          const specialClickable =
+            specialMode &&
+            !iHaveSpecial &&
+            !specialHere &&
+            building?.ownerId === myPlayerId &&
+            (buildMode === "lighthouse" ? isCoastal : true);
           const clickable =
             (buildMode === "settlement" && !building && canAffordSettlement) ||
             (buildMode === "city" && building?.ownerId === myPlayerId && building.type === "settlement" && canAffordCity) ||
+            specialClickable ||
             (state.phase === "setup" && !building && isMyTurn && !state.setupStepAwaitingRoad);
+
+          const specialOwner = specialHere && state.players.find((pl) => pl.id === specialHere.ownerId);
 
           return (
             <g key={vk}>
@@ -348,6 +363,8 @@ export function HexBoard({
                     sendAction(
                       state.phase === "setup"
                         ? { type: "placeSetupSettlement", vertex: v }
+                        : specialMode
+                        ? { type: "buildSpecial", building: buildMode, vertex: v }
                         : buildMode === "city"
                         ? { type: "buildCity", vertex: v }
                         : { type: "buildSettlement", vertex: v }
@@ -358,17 +375,24 @@ export function HexBoard({
               {/* Ghost preview of what a tap would build here. */}
               {clickable && buildMode && buildMode !== "roadBuilding" && (
                 <g className="build-ghost">
-                  <BuildingSprite
-                    type={buildMode === "city" ? "city" : "settlement"}
-                    cx={p.x}
-                    cy={p.y}
-                    size={view.scale}
-                    color={me?.color ?? "#fff"}
-                  />
+                  {specialMode ? (
+                    <SpecialBuildingSprite type={buildMode as SpecialBuildingId} cx={p.x} cy={p.y} size={view.scale} />
+                  ) : (
+                    <BuildingSprite
+                      type={buildMode === "city" ? "city" : "settlement"}
+                      cx={p.x}
+                      cy={p.y}
+                      size={view.scale}
+                      color={me?.color ?? "#fff"}
+                    />
+                  )}
                 </g>
               )}
               {building && (
                 <BuildingSprite type={building.type} cx={p.x} cy={p.y} size={view.scale} color={owner?.color ?? "#fff"} />
+              )}
+              {specialHere && (
+                <SpecialBuildingSprite type={specialHere.id} cx={p.x} cy={p.y} size={view.scale} color={specialOwner?.color} />
               )}
             </g>
           );
@@ -917,6 +941,48 @@ function BuildingSprite({ type, cx, cy, size, color }: { type: "settlement" | "c
       <rect x={x} y={y} width={w} height={bodyH} fill={color} />
       <polygon points={`${x - sw},${y + sw} ${cx},${y - roofH} ${x + w + sw},${y + sw}`} fill={shade(color, 0.58)} />
       <rect x={cx - w * 0.17} y={y + bodyH * 0.42} width={w * 0.34} height={bodyH * 0.58} fill={dark} />
+    </g>
+  );
+}
+
+/**
+ * Special buildings, drawn a touch above the settlement/city they sit on so both
+ * read at once. A lighthouse is a red-and-white striped tower with a glowing
+ * lamp; a watchtower is a stone tower with a little pennant. An optional owner
+ * colour paints a small base so you can tell whose it is.
+ */
+function SpecialBuildingSprite({ type, cx, cy, size, color }: { type: SpecialBuildingId; cx: number; cy: number; size: number; color?: string }) {
+  const sw = Math.max(1, size * 0.022);
+  const w = size * 0.2;
+  const h = size * 0.36;
+  const x = cx - w / 2;
+  const top = cy - size * 0.36; // hover above the building sprite
+  const base = color ? (
+    <ellipse cx={cx} cy={top + h} rx={w * 0.62} ry={w * 0.22} fill={color} opacity={0.9} stroke={shade(color, 0.55)} strokeWidth={sw} />
+  ) : null;
+  if (type === "lighthouse") {
+    const stripe = h / 4;
+    return (
+      <g stroke="#7a2318" strokeWidth={sw} strokeLinejoin="round">
+        {base}
+        <polygon points={`${x} ${top + h} ${x + w} ${top + h} ${x + w * 0.72} ${top + stripe} ${x + w * 0.28} ${top + stripe}`} fill="#f4f4f4" />
+        <rect x={x + w * 0.28} y={top + stripe} width={w * 0.44} height={stripe} fill="#e63946" stroke="none" />
+        <rect x={x + w * 0.14} y={top + stripe * 2.3} width={w * 0.72} height={stripe} fill="#e63946" stroke="none" />
+        <rect x={cx - w * 0.28} y={top - size * 0.03} width={w * 0.56} height={size * 0.06} fill="#3a3a3a" />
+        <circle cx={cx} cy={top} r={size * 0.05} fill="#f4d35e" />
+      </g>
+    );
+  }
+  return (
+    <g stroke="#3a4a3f" strokeWidth={sw} strokeLinejoin="round">
+      {base}
+      <rect x={x} y={top + h * 0.18} width={w} height={h * 0.82} fill="#9aa7a0" />
+      <rect x={x} y={top + h * 0.06} width={w * 0.3} height={h * 0.16} fill="#7f8d86" />
+      <rect x={cx - w * 0.15} y={top + h * 0.06} width={w * 0.3} height={h * 0.16} fill="#7f8d86" />
+      <rect x={x + w * 0.7} y={top + h * 0.06} width={w * 0.3} height={h * 0.16} fill="#7f8d86" />
+      <line x1={cx} y1={top - size * 0.06} x2={cx} y2={top + h * 0.06} stroke="#5a4632" strokeWidth={sw * 1.2} />
+      <polygon points={`${cx} ${top - size * 0.06} ${cx + w * 0.5} ${top - size * 0.03} ${cx} ${top}`} fill="#457b9d" stroke="none" />
+      <rect x={cx - w * 0.08} y={top + h * 0.42} width={w * 0.16} height={h * 0.3} fill="#3a4a3f" stroke="none" />
     </g>
   );
 }

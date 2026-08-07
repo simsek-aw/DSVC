@@ -74,15 +74,23 @@ export interface Player {
   // owner ever sees it (viewFor blanks it for everyone else until the game ends);
   // when its condition is met it silently adds hidden victory points.
   objective: SecretObjectiveId | null;
-  // The single special building this player has bought, when the room enables
+  // The single special building this player has raised, when the room enables
   // them. Each player may build at most ONE, it gives no victory points — only a
-  // one-off strategic effect. No board placement.
-  specialBuildings: SpecialBuildingId[];
+  // one-off strategic effect. It is placed on a vertex where the player already
+  // has a settlement or city, so it is visible on the board.
+  specialBuildings: SpecialBuildingPlacement[];
 }
 
-// Optional off-board buildings. Each grants an effect (not victory points), and
-// every player may build only ONE of them for the whole game — a real trade-off.
+// Optional buildings. Each grants an effect (not victory points), and every
+// player may build only ONE for the whole game — a real trade-off. It attaches
+// to one of the player's own building vertices so it shows up on the map.
 export type SpecialBuildingId = "lighthouse" | "watchtower";
+
+export interface SpecialBuildingPlacement {
+  id: SpecialBuildingId;
+  vertex: VertexId;
+  ownerId: string;
+}
 
 export interface SpecialBuilding {
   id: SpecialBuildingId;
@@ -313,4 +321,4 @@ export type ClientAction =
   | { type: "endTurn" }
   | { type: "restartGame" }
   | { type: "setRoomSettings"; settings: Partial<GameSettings> }
-  | { type: "buildSpecial"; building: SpecialBuildingId };
+  | { type: "buildSpecial"; building: SpecialBuildingId; vertex: VertexId };

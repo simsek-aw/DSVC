@@ -77,28 +77,48 @@ console.log("objectives: all passed");
 
 // --- Special buildings: gated by the room toggle, one per player, no VP,
 //     each with an effect (lighthouse = better bank rate). ---
-import { SPECIAL_BUILDINGS, bestBankRatio } from "./dist/index.js";
+import { SPECIAL_BUILDINGS, bestBankRatio, buildBoardGraph, tilesTouchingVertex, TILE_SIZE } from "./dist/index.js";
 {
   let s = createLobby("SB1");
   s = addPlayer(s, "A", "Anna");
   s = addPlayer(s, "B", "Ben");
-  // disabled by default -> rejected
-  let threw = false;
-  try { applyAction(s, "A", { type: "buildSpecial", building: "lighthouse" }); } catch { threw = true; }
-  assert(threw, "buildSpecial rejected when disabled");
-
   s = applyAction(s, "A", { type: "setRoomSettings", settings: { specialBuildings: true } });
   s = startGame(s);
   s = applyAction(s, "A", { type: "rollTurnOrder" });
   s = applyAction(s, "B", { type: "rollTurnOrder" });
-  // force into mainGame with A on turn and plenty of resources
+
+  // Find a coastal and an interior vertex, plant A's settlements on both.
+  const g = buildBoardGraph(s.tiles, TILE_SIZE);
+  let coastal = null, interior = null;
+  for (const v of g.vertices.values()) {
+    const n = tilesTouchingVertex(g, v).length;
+    if (n > 0 && n < 3 && !coastal) coastal = v;
+    if (n >= 3 && !interior) interior = v;
+    if (coastal && interior) break;
+  }
+  assert(coastal && interior, "found coastal + interior vertex");
+
+  // force into mainGame with A on turn, buildings placed, plenty of resources
   s = { ...s, phase: "mainGame", currentPlayerIndex: 0, turnOrder: ["A", "B"],
+    buildings: [ { vertex: coastal, type: "settlement", ownerId: "A" }, { vertex: interior, type: "settlement", ownerId: "A" } ],
     players: s.players.map((p) => (p.id === "A" ? { ...p, resources: { wood: 5, brick: 5, ore: 5, wheat: 5, sheep: 5 } } : p)) };
+
+  // disabled-room rejection is covered elsewhere; here: needs an own building.
+  let threwNoBldg = false;
+  try { applyAction(s, "A", { type: "buildSpecial", building: "watchtower", vertex: [...g.vertices.values()].find((v)=>![coastal,interior].includes(v)) }); }
+  catch { threwNoBldg = true; }
+  assert(threwNoBldg, "special building needs an own building at the vertex");
+
+  // lighthouse refused inland
+  let threwInland = false;
+  try { applyAction(s, "A", { type: "buildSpecial", building: "lighthouse", vertex: interior }); } catch { threwInland = true; }
+  assert(threwInland, "lighthouse refused on an interior vertex");
 
   const rateBefore = bestBankRatio(s, "A", "wood");
   const vpBefore = totalVictoryPoints(s, "A");
-  s = applyAction(s, "A", { type: "buildSpecial", building: "lighthouse" });
-  assert(s.players.find((p) => p.id === "A").specialBuildings.includes("lighthouse"), "lighthouse recorded");
+  s = applyAction(s, "A", { type: "buildSpecial", building: "lighthouse", vertex: coastal });
+  const rec = s.players.find((p) => p.id === "A").specialBuildings;
+  assert(rec.length === 1 && rec[0].id === "lighthouse" && rec[0].vertex === coastal, "lighthouse recorded with its vertex");
   assert(totalVictoryPoints(s, "A") === vpBefore, "special building gives NO victory points");
   assert(bestBankRatio(s, "A", "wood") === Math.max(2, rateBefore - 1), "lighthouse improves bank rate by one step");
   const spentWood = 5 - s.players.find((p) => p.id === "A").resources.wood;
@@ -106,7 +126,7 @@ import { SPECIAL_BUILDINGS, bestBankRatio } from "./dist/index.js";
 
   // limit 1: cannot build the other one afterwards
   let threw2 = false;
-  try { applyAction(s, "A", { type: "buildSpecial", building: "watchtower" }); } catch { threw2 = true; }
+  try { applyAction(s, "A", { type: "buildSpecial", building: "watchtower", vertex: interior }); } catch { threw2 = true; }
   assert(threw2, "second special building rejected (limit 1)");
 }
 

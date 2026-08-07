@@ -469,13 +469,32 @@ body {
   font-size: 0.7rem;
 }
 
+/* Horizontal scroller: the five core builds fit the width; any extra tiles
+   (the special buildings) sit just past the right edge, with a sliver peeking
+   as a hint that a swipe reveals more. */
 .build-bar {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
   gap: 4px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+/* soft fade on the right edge so the cut-off tile reads as "more this way" —
+   only when there are extra (special-building) tiles to scroll to. */
+.build-bar.has-more {
+  -webkit-mask-image: linear-gradient(to right, #000 92%, rgba(0, 0, 0, 0.35) 100%);
+  mask-image: linear-gradient(to right, #000 92%, rgba(0, 0, 0, 0.35) 100%);
+}
+.build-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .build-tile {
+  /* Five tiles fill the row; a sliver of the sixth peeks to invite a swipe. */
+  flex: 0 0 19%;
+  min-width: 60px;
+  scroll-snap-align: start;
   display: flex;
   flex-direction: column;
   align-items: center;

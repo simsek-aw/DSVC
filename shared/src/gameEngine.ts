@@ -539,7 +539,7 @@ export function bestBankRatio(state: GameState, playerId: string, resource: Reso
   if (state.weather?.kind === "fair") best = Math.max(2, best - 1);
   // A lighthouse permanently improves this player's maritime trade by one step.
   const owner = state.players.find((p) => p.id === playerId);
-  if (owner?.specialBuildings.includes("lighthouse")) best = Math.max(2, best - 1);
+  if (owner?.specialBuildings.some((s) => s.id === "lighthouse")) best = Math.max(2, best - 1);
   return best;
 }
 
@@ -1313,10 +1313,20 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
         throw new GameError("Du darfst nur einen Sonderbau bauen.");
       if (!hasEnoughResources(player, spec.cost)) throw new GameError(`Nicht genug Rohstoffe für ${spec.title}.`);
 
+      // Placement: it attaches to one of your own settlements/cities so it shows
+      // on the board. A lighthouse only makes sense on the coast.
+      const vk = vertexKey(action.vertex);
+      const mine = state.buildings.find((b) => vertexKey(b.vertex) === vk && b.ownerId === playerId);
+      if (!mine) throw new GameError("Ein Sonderbau braucht eine eigene Siedlung oder Stadt an dieser Stelle.");
+      if (state.players.some((p) => p.specialBuildings.some((s) => vertexKey(s.vertex) === vk)))
+        throw new GameError("Hier steht schon ein Sonderbau.");
+      const graph = buildBoardGraph(state.tiles, TILE_SIZE);
+      if (action.building === "lighthouse" && tilesTouchingVertex(graph, action.vertex).length >= 3)
+        throw new GameError("Ein Leuchtturm steht nur an der Küste — wähle eine Siedlung am Wasser.");
+
       let tiles = state.tiles;
       if (action.building === "watchtower") {
         // Reveal (privately scout) every hidden tile adjacent to my buildings.
-        const graph = buildBoardGraph(state.tiles, TILE_SIZE);
         const myTileKeys = new Set<string>();
         for (const b of state.buildings) {
           if (b.ownerId !== playerId) continue;
@@ -1330,7 +1340,9 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       }
 
       const players = state.players.map((p) =>
-        p.id === playerId ? { ...payCost(p, spec.cost), specialBuildings: [...p.specialBuildings, action.building] } : p
+        p.id === playerId
+          ? { ...payCost(p, spec.cost), specialBuildings: [...p.specialBuildings, { id: action.building, vertex: action.vertex, ownerId: playerId }] }
+          : p
       );
       return {
         ...state,

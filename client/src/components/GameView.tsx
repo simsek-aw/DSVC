@@ -587,6 +587,12 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <div className="mode-hint">Wähle ein verdecktes Nachbarfeld — nur du siehst, was dort liegt</div>
         )}
         {buildMode === "bribery" && <div className="mode-hint">Wähle ein aufgedecktes Feld für die Bestechung</div>}
+        {buildMode === "lighthouse" && (
+          <div className="mode-hint">Wähle eine eigene Siedlung/Stadt an der Küste für den Leuchtturm</div>
+        )}
+        {buildMode === "watchtower" && (
+          <div className="mode-hint">Wähle eine eigene Siedlung/Stadt für den Späherturm</div>
+        )}
         {buildMode === "roadBuilding" && (
           <div className="mode-hint">
             {freeRoadEdges.length}/2 Straßen gewählt
@@ -685,7 +691,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         )}
 
         {state.phase === "mainGame" && isMyTurn && state.lastDiceRoll && !confirmingBuyCard && (
-          <div className="build-bar">
+          <div className={`build-bar ${state.settings.specialBuildings ? "has-more" : ""}`}>
             <BuildTile
               icon="🛤️"
               label="Straße"
@@ -728,7 +734,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             />
             {state.settings.specialBuildings &&
               Object.values(SPECIAL_BUILDINGS).map((spec) => {
-                const isBuilt = me?.specialBuildings.includes(spec.id as SpecialBuildingId) ?? false;
+                const isBuilt = me?.specialBuildings.some((s) => s.id === spec.id) ?? false;
                 const usedOne = (me?.specialBuildings.length ?? 0) > 0;
                 return (
                   <BuildTile
@@ -738,10 +744,10 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                     title={`${spec.title} — ${spec.desc}`}
                     cost={spec.cost}
                     resources={me?.resources}
-                    active={false}
+                    active={buildMode === spec.id}
                     built={isBuilt}
                     locked={usedOne && !isBuilt}
-                    onClick={() => sendAction({ type: "buildSpecial", building: spec.id })}
+                    onClick={() => setBuildMode(buildMode === spec.id ? null : (spec.id as SpecialBuildingId))}
                   />
                 );
               })}

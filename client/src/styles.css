@@ -383,6 +383,61 @@ body {
   letter-spacing: 0.05em;
 }
 
+/* Weather now shows top-left as a persistent round-status chip. */
+.weather-status {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 44%;
+  padding: 5px 10px;
+  border: 1px solid #6b8f94;
+  border-radius: 999px;
+  background: rgba(13, 27, 30, 0.9);
+  color: #cdeef0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  animation: weather-status-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.weather-status .weather-icon {
+  font-size: 0.95rem;
+}
+@keyframes weather-status-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Room code lives in the burger menu now. */
+.menu-roomcode {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 12px 8px;
+  border-bottom: 1px solid #24424766;
+  margin-bottom: 4px;
+}
+.menu-roomcode > span {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7fa6ab;
+}
+.menu-roomcode-value {
+  background: none;
+  border: none;
+  color: #f4a261;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-size: 0.95rem;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
 .hamburger-menu {
   position: absolute;
   top: 10px;
@@ -606,7 +661,7 @@ body {
   font-weight: 700;
   text-align: center;
   pointer-events: none;
-  animation: turn-popup-in-out 2.5s ease forwards;
+  animation: turn-popup-in-out 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   /* Long lines (e.g. "Orange erhält 2 Holz, 1 Erz …") must wrap and stay on
      screen instead of running past the edges. */
   max-width: min(86vw, 360px);
@@ -1227,6 +1282,51 @@ body {
   color: #e6a15a;
   margin-left: 2px;
 }
+/* Known-VP peek that pops above a chip on a single tap. */
+.pt-vp-peek {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #10242a;
+  border: 1px solid #f4d35e;
+  color: #f4d35e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  animation: weather-status-in 0.18s ease;
+}
+
+/* Dismissible opening-phase hint under the banner. */
+.setup-note-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 8px 6px 10px;
+  border-radius: 12px;
+  background: rgba(13, 27, 30, 0.9);
+  border: 1px solid #2a6f7a;
+  color: #cdeef0;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+.setup-note-icon {
+  flex-shrink: 0;
+}
+.setup-note-x {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #8fb4b9;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
 /* A chip you can trade with gets a faint handshake hint and stays tappable. */
 .pt-chip.tradable {
   cursor: pointer;
@@ -1238,6 +1338,30 @@ body {
 }
 .pt-chip:disabled {
   cursor: default;
+}
+
+/* Player-trade: a simple row of players to open the negotiation table with. */
+.trade-player-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.trade-player-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1.5px solid #2a4a4f;
+  border-radius: 10px;
+  background: #142c30;
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.trade-player-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* One-time hint above the turn bar teaching the double-tap-to-trade gesture. */

@@ -131,9 +131,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [monopolyPick, setMonopolyPick] = useState<ResourceType>("wood");
   const [bankGive, setBankGive] = useState<ResourceType>("wood");
   const [bankReceive, setBankReceive] = useState<ResourceType>("brick");
-  const [tradeTarget, setTradeTarget] = useState<string>("");
-  const [tradeGive, setTradeGive] = useState<Partial<Record<ResourceType, number>>>({});
-  const [tradeReceive, setTradeReceive] = useState<Partial<Record<ResourceType, number>>>({});
   const [showTradePanel, setShowTradePanel] = useState(false);
   const [showCards, setShowCards] = useState(false);
   const [showBuild, setShowBuild] = useState(false);
@@ -141,6 +138,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logExpanded, setLogExpanded] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
+  const [setupNoteDismissed, setSetupNoteDismissed] = useState(false);
+  const [vpPeek, setVpPeek] = useState<{ id: string; vp: number } | null>(null);
 
   const me = state.players.find((p) => p.id === myPlayerId);
   const currentPlayerId = state.turnOrder[state.currentPlayerIndex];
@@ -229,10 +228,12 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   };
 
   const incomingTrade = state.pendingTrade && state.pendingTrade.toPlayerId === myPlayerId ? state.pendingTrade : null;
-  const outgoingTrade = state.pendingTrade && state.pendingTrade.fromPlayerId === myPlayerId ? state.pendingTrade : null;
 
   const [turnPopup, setTurnPopup] = useState<string | null>(null);
   const [gains, setGains] = useState<{ id: string; resource: ResourceType; amount: number }[]>([]);
+  // The counts actually shown on the deck. They trail the real resources during
+  // a fly-in so the number only ticks up once the sprite has landed.
+  const [shownResources, setShownResources] = useState(me?.resources);
   const [flights, setFlights] = useState<Flight[]>([]);
   const boardApiRef = useRef<BoardApi | null>(null);
   const chipRefs = useRef<Partial<Record<ResourceType, HTMLDivElement | null>>>({});
@@ -437,7 +438,11 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       const diff = me.resources[r] - (prev[r] ?? 0);
       if (diff > 0) newGains.push({ id: `${Date.now()}-${r}-${Math.random()}`, resource: r, amount: diff });
     }
-    if (newGains.length === 0) return;
+    // Pure losses/no-ops: reflect the new counts right away, nothing to animate.
+    if (newGains.length === 0) {
+      setShownResources(me.resources);
+      return;
+    }
 
     const showGains = () => {
       setGains((g) => [...g, ...newGains]);
@@ -466,12 +471,18 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       prodRollRef.current = rollKey;
       setFlights((f) => [...f, ...spawned]);
       spawned.forEach((fl) => setTimeout(() => setFlights((cur) => cur.filter((x) => x.id !== fl.id)), FLIGHT_MS + 60));
-      // The count lands with the sprites.
-      const t = setTimeout(showGains, FLIGHT_MS - 80);
+      // The "+N" and the higher deck count both land WITH the sprite, so the
+      // number never ticks up before the resource has visibly arrived.
+      const landed = me.resources;
+      const t = setTimeout(() => {
+        showGains();
+        setShownResources(landed);
+      }, FLIGHT_MS - 80);
       return () => clearTimeout(t);
     }
     // Non-harvest gains (trade, dev card, treasure): show the count right away.
     showGains();
+    setShownResources(me.resources);
   }, [me?.resources]);
 
   // Track the steal in flight so the gain effect above can tell a robbery apart
@@ -483,6 +494,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   // A trade is started by DOUBLE-tapping a player's chip (single taps are too
   // easy to trigger by accident). We show a one-time hint the first time.
   const lastChipTapRef = useRef<{ id: string; at: number } | null>(null);
+  const chipTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tradeHintSeen, setTradeHintSeen] = useState(() => {
     try {
       return localStorage.getItem("canos_trade_hint") === "1";
@@ -498,15 +510,26 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
       /* ignore */
     }
   };
-  const onChipDoubleTap = (pid: string) => {
+  // Single tap peeks a player's known victory points; double tap starts a trade
+  // (when allowed). A short timer tells the two gestures apart.
+  const onChipTap = (pid: string, canTrade: boolean) => {
     const now = Date.now();
     const prev = lastChipTapRef.current;
     if (prev && prev.id === pid && now - prev.at < 450) {
       lastChipTapRef.current = null;
-      markTradeHintSeen();
-      sendAction({ type: "startNegotiation", withPlayerId: pid });
+      if (chipTapTimerRef.current) clearTimeout(chipTapTimerRef.current);
+      setVpPeek(null);
+      if (canTrade) {
+        markTradeHintSeen();
+        sendAction({ type: "startNegotiation", withPlayerId: pid });
+      }
     } else {
       lastChipTapRef.current = { id: pid, at: now };
+      if (chipTapTimerRef.current) clearTimeout(chipTapTimerRef.current);
+      chipTapTimerRef.current = setTimeout(() => {
+        setVpPeek({ id: pid, vp: totalVictoryPoints(state, pid) });
+        setTimeout(() => setVpPeek((cur) => (cur && cur.id === pid ? null : cur)), 1900);
+      }, 460);
     }
   };
   // Auto-dismiss the one-time hint after a few seconds even if untouched.
@@ -673,15 +696,36 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             <p>{mapInfo.text}</p>
           </div>
         )}
-        <div className="room-code-corner" title="Raum-Code — zum Wiederbeitreten mit demselben Namen eingeben">
-          {state.roomId}
-        </div>
+        {/* Weather is a round-long status, so it lives top-left as a chip
+            (where the room code used to sit — the code moved into the menu). */}
+        {state.weather && (
+          <button
+            className="weather-status"
+            onClick={() => setMapInfo({ title: WEATHER_INFO[state.weather!.kind].title, text: describeWeather(state.weather!) })}
+            title="Ereignis dieser Runde — antippen für Details"
+          >
+            <span className="weather-icon">{WEATHER_INFO[state.weather.kind].icon}</span>
+            <span>{WEATHER_INFO[state.weather.kind].title}</span>
+          </button>
+        )}
         <div className="hamburger-menu">
           <button className="hamburger-btn" onClick={() => setMenuOpen((v) => !v)} aria-label="Menü">
             ☰
           </button>
           {menuOpen && (
             <div className="hamburger-dropdown">
+              <div className="menu-roomcode" title="Raum-Code — zum Wiederbeitreten mit demselben Namen eingeben">
+                <span>Raum-Code</span>
+                <button
+                  className="menu-roomcode-value"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(state.roomId).catch(() => {});
+                  }}
+                  title="Code kopieren"
+                >
+                  {state.roomId} 📋
+                </button>
+              </div>
               {"Notification" in window && (
                 <button
                   onClick={() => {
@@ -709,6 +753,17 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <div className={`turn-banner ${bannerIsYou ? "you" : ""}`}>
             <span>{bannerStatus}</span>
           </div>
+          {/* One-off hint for the opening phase; dismissible, and it disappears
+              on its own once setup is over. */}
+          {state.phase === "setup" && !setupNoteDismissed && (
+            <div className="setup-note-card">
+              <span className="setup-note-icon">ℹ️</span>
+              <span>Schlangenreihenfolge: Runde 2 läuft rückwärts — wer zuletzt legt, ist direkt nochmal dran.</span>
+              <button className="setup-note-x" onClick={() => setSetupNoteDismissed(true)} aria-label="Hinweis schließen">
+                ✕
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Combined turn-order timeline + player list: shows the play order with
@@ -730,9 +785,14 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                     <button
                       className={`pt-chip ${isCurrent ? "current" : ""} ${isMe ? "me" : ""} ${canTrade ? "tradable" : ""}`}
                       style={{ borderColor: p.color, background: isCurrent ? p.color : undefined }}
-                      disabled={isMe}
-                      onPointerDown={() => canTrade && onChipDoubleTap(p.id)}
-                      title={isMe ? p.name : canTrade ? `Doppeltippen zum Traden mit ${p.name}` : p.name}
+                      onPointerDown={() => onChipTap(p.id, canTrade)}
+                      title={
+                        isMe
+                          ? `${p.name} — antippen für Punkte`
+                          : canTrade
+                          ? `Antippen: Punkte · Doppeltippen: mit ${p.name} traden`
+                          : `${p.name} — antippen für Punkte`
+                      }
                     >
                       <span className="pt-dot" style={{ background: p.color }} />
                       <span className="pt-name">{p.name}</span>
@@ -740,6 +800,9 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                       {state.largestArmyPlayerId === p.id && <span title="Größte Rittermacht">⚔️</span>}
                       {canTrade && <span className="pt-trade" aria-hidden="true">🤝</span>}
                       {!p.connected && <span className="pt-offline">offline</span>}
+                      {vpPeek && vpPeek.id === p.id && (
+                        <span className="pt-vp-peek">🏆 {vpPeek.vp}</span>
+                      )}
                     </button>
                   </div>
                 );
@@ -751,16 +814,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <div className="trade-hint" role="status">
             👆 Doppeltippe einen Mitspieler zum Traden
           </div>
-        )}
-        {state.weather && (
-          <button
-            className="weather-banner"
-            onClick={() => setMapInfo({ title: WEATHER_INFO[state.weather!.kind].title, text: describeWeather(state.weather!) })}
-            title="Ereignis dieser Runde — antippen für Details"
-          >
-            <span className="weather-icon">{WEATHER_INFO[state.weather.kind].icon}</span>
-            <span>{WEATHER_INFO[state.weather.kind].title}</span>
-          </button>
         )}
         {buildMode === "knight" && <div className="mode-hint">Wähle ein Feld für den Ritter-Räuber</div>}
         {buildMode === "scout" && (
@@ -852,11 +905,6 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           </div>
         )}
 
-        {state.phase === "setup" && (
-          <p className="hint setup-note">
-            Schlangenreihenfolge: Runde 2 läuft rückwärts — wer zuletzt gelegt hat, ist direkt nochmal dran.
-          </p>
-        )}
 
         {confirmingBuyCard && (
           <div className="confirm-banner">
@@ -900,7 +948,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                 <span className="resource-icon">
                   <ResourceSprite resource={key} size={26} />
                 </span>
-                <span className="resource-count">{me.resources[key]}</span>
+                <span className="resource-count">{shownResources?.[key] ?? me.resources[key]}</span>
               </div>
             ))}
           </div>
@@ -1050,26 +1098,25 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
             </div>
 
             <h4>Spielerhandel</h4>
-            <div className="inline-picker">
-              <select value={tradeTarget} onChange={(e) => setTradeTarget(e.target.value)}>
-                <option value="">Spieler wählen …</option>
-                {otherPlayers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+            <p className="hint">Tippe einen Mitspieler an, um den Verhandlungstisch zu öffnen — Feinheiten klärt ihr im Chat.</p>
+            <div className="trade-player-row">
+              {otherPlayers.map((p) => (
+                <button
+                  key={p.id}
+                  className="trade-player-btn"
+                  style={{ borderColor: p.color }}
+                  disabled={!!state.negotiation}
+                  onClick={() => {
+                    sendAction({ type: "startNegotiation", withPlayerId: p.id });
+                    setShowTradePanel(false);
+                  }}
+                >
+                  <span className="player-dot" style={{ background: p.color }} />
+                  {p.name}
+                </button>
+              ))}
             </div>
-            <ResourceCountEditor label="Ich gebe" values={tradeGive} onChange={setTradeGive} />
-            <ResourceCountEditor label="Ich will" values={tradeReceive} onChange={setTradeReceive} />
-            <button
-              className="primary-button small"
-              disabled={!tradeTarget || !!state.pendingTrade}
-              onClick={() => sendAction({ type: "offerTrade", toPlayerId: tradeTarget, give: tradeGive, receive: tradeReceive })}
-            >
-              Angebot senden
-            </button>
-            {outgoingTrade && <p className="hint">Warte auf Antwort von {state.players.find((p) => p.id === outgoingTrade.toPlayerId)?.name} …</p>}
+            {state.negotiation && <p className="hint">Ein Verhandlungstisch läuft bereits.</p>}
           </div>
         )}
 
@@ -1258,30 +1305,3 @@ function describeResources(r: Partial<Record<ResourceType, number>>): string {
   return parts.length > 0 ? parts.join(", ") : "nichts";
 }
 
-function ResourceCountEditor({
-  label,
-  values,
-  onChange,
-}: {
-  label: string;
-  values: Partial<Record<ResourceType, number>>;
-  onChange: (v: Partial<Record<ResourceType, number>>) => void;
-}) {
-  return (
-    <div className="resource-count-editor">
-      <span className="editor-label">{label}</span>
-      {RESOURCE_TYPES.map((r) => (
-        <label key={r} className="count-field">
-          {RESOURCE_LABELS[r]}
-          <input
-            type="number"
-            min={0}
-            max={9}
-            value={values[r] ?? 0}
-            onChange={(e) => onChange({ ...values, [r]: Math.max(0, Number(e.target.value)) })}
-          />
-        </label>
-      ))}
-    </div>
-  );
-}

@@ -31,6 +31,7 @@ import { NegotiationTable } from "./NegotiationTable";
 import { DiscardPanel, StealPanel } from "./RobberPanels";
 import { VictoryScreen } from "./VictoryScreen";
 import { ResourceSprite, PixelDie } from "./PixelIcons";
+import { shareInvite } from "../invite";
 
 interface Props {
   state: GameState;
@@ -57,6 +58,18 @@ const RESOURCE_NAMES: Record<ResourceType, string> = {
 
 // Leading emojis the engine puts on "big play" log lines worth a popup.
 const ANNOUNCE_EMOJIS = ["⚔️", "🏅", "🛣️", "📈", "💡", "🛤️", "💰", "🎁"];
+
+const HELP_TEXT = [
+  "Ziel: 10 Siegpunkte. Siedlung = 1, Stadt = 2, Längste Straße & Größte Rittermacht je +2.",
+  "",
+  "Bauen: 🛤️ Straße = Holz+Lehm · 🏠 Siedlung = Holz+Lehm+Weizen+Wolle · 🏙️ Stadt = 2 Weizen+3 Erz · 🃏 Karte = Erz+Weizen+Wolle.",
+  "",
+  "Würfeln: Jede Zahl liefert allen Anliegern die Ressource des Feldes. Bei einer 7 zieht der Räuber, und wer mehr als 7 Karten hat, wirft die Hälfte ab.",
+  "",
+  "Handel: 🔁 mit der Bank (Rate je nach Hafen) oder per Verhandlungstisch mit Mitspielern (Chip doppeltippen).",
+  "",
+  "Verdeckt: Felder sind erst aufgedeckt, wenn eine Siedlung sie berührt — spähen (🔭) zeigt sie dir privat.",
+].join("\n");
 
 // A resource sprite in flight from a producing tile to its resource chip.
 interface Flight {
@@ -726,6 +739,22 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                   {state.roomId} 📋
                 </button>
               </div>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  setMapInfo({ title: "Spielhilfe", text: HELP_TEXT });
+                }}
+              >
+                📖 Spielhilfe
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  shareInvite(state.roomId);
+                }}
+              >
+                🔗 Einladungslink teilen
+              </button>
               {"Notification" in window && (
                 <button
                   onClick={() => {

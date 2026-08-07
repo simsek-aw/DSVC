@@ -1,4 +1,5 @@
-import { GameState, ResourceType, RESOURCE_TYPES } from "@canos/shared";
+import { useState } from "react";
+import { GameState, ResourceType, RESOURCE_TYPES, CHAT_PREFIX, CHAT_MAX_LENGTH } from "@canos/shared";
 import { ResourceSprite } from "./PixelIcons";
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function NegotiationTable({ state, myPlayerId, sendAction }: Props) {
+  const [chatDraft, setChatDraft] = useState("");
   const negotiation = state.negotiation;
   if (!negotiation) return null;
 
@@ -128,6 +130,39 @@ export function NegotiationTable({ state, myPlayerId, sendAction }: Props) {
           {theyConfirmed ? `${other?.name} hat bestätigt.` : `Warte auf ${other?.name}.`} Jede Änderung am Tisch setzt
           beide Bestätigungen zurück.
         </p>
+
+        {/* Chat right at the table, so you can haggle without leaving it. */}
+        <div className="negotiation-chat">
+          <div className="negotiation-chat-log">
+            {state.log
+              .filter((l) => l.startsWith(CHAT_PREFIX))
+              .slice(-4)
+              .map((l, i) => (
+                <div key={i} className="log-line chat">{l}</div>
+              ))}
+          </div>
+          <form
+            className="chat-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const text = chatDraft.trim();
+              if (!text) return;
+              sendAction({ type: "sendChat", text });
+              setChatDraft("");
+            }}
+          >
+            <input
+              className="chat-input"
+              placeholder="Zum Aushandeln schreiben …"
+              value={chatDraft}
+              maxLength={CHAT_MAX_LENGTH}
+              onChange={(e) => setChatDraft(e.target.value)}
+            />
+            <button className="chat-send" type="submit" disabled={!chatDraft.trim()} aria-label="Senden">
+              ➤
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

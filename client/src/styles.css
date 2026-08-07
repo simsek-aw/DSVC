@@ -103,6 +103,11 @@ body {
   padding: 24px;
   width: min(420px, 92vw);
   text-align: center;
+  /* With several Zusatzregeln the content can be taller than the screen; make
+     it scroll so "Spiel starten" is always reachable instead of clipped. */
+  max-height: 100dvh;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .lobby-screen h1 {
@@ -1500,6 +1505,23 @@ body {
   font-style: italic;
 }
 
+/* Compact chat inside the negotiation overlay. */
+.negotiation-chat {
+  margin-top: 10px;
+  border-top: 1px solid #2a4a4f;
+  padding-top: 8px;
+}
+.negotiation-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 1.2em;
+  max-height: 84px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+}
+
 .negotiation-hand {
   display: flex;
   flex-direction: column;
@@ -1807,6 +1829,9 @@ body {
   font-size: 0.8rem;
   line-height: 1.35;
   color: #a8dadc;
+  white-space: pre-line; /* preserve the line breaks in multi-line help text */
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 /* Chat lives at the bottom of the log panel — same stream, own input. */

@@ -1901,6 +1901,52 @@ body {
   100% { opacity: 0; }
 }
 
+/* A hidden tile flipping face-up when a settlement (or the setup) uncovers it. */
+.tile-reveal {
+  transform-box: fill-box;
+  animation: tile-flip 0.55s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+
+@keyframes tile-flip {
+  0% { transform: scaleX(0.05); filter: brightness(1.9); }
+  55% { transform: scaleX(1.06); filter: brightness(1.3); }
+  100% { transform: scaleX(1); filter: brightness(1); }
+}
+
+/* The number token dropping onto its tile the moment the board goes live. */
+.number-drop {
+  transform-box: fill-box;
+  animation: token-drop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+@keyframes token-drop {
+  0% { transform: translateY(-140%) scale(1.5); opacity: 0; }
+  70% { transform: translateY(0) scale(0.9); opacity: 1; }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* A freshly-built road, settlement or city popping into place with a bounce. */
+.build-pop {
+  transform-box: fill-box;
+  animation: build-pop 0.42s cubic-bezier(0.34, 1.56, 0.5, 1) both;
+}
+
+@keyframes build-pop {
+  0% { transform: scale(0); opacity: 0.2; }
+  65% { transform: scale(1.22); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* Weather wash fades in gently rather than snapping on. */
+.weather-tint {
+  animation: weather-tint-in 0.9s ease both;
+}
+
+@keyframes weather-tint-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* What you should do now, or who the game is waiting on. */
 .action-hint {
   border-radius: 8px;

@@ -62,6 +62,14 @@ const TERRAIN_COLORS: Record<string, string> = {
   unknown: "#22364a",
 };
 
+// A translucent full-board wash per weather event, layered over sea and land.
+const WEATHER_TINT: Record<string, string> = {
+  drought: "rgba(232, 150, 46, 0.16)", // dry, warm heat-haze
+  storm: "rgba(24, 40, 74, 0.26)", // dark squall
+  bounty: "rgba(255, 213, 92, 0.12)", // golden abundance
+  fair: "rgba(150, 232, 255, 0.09)", // cool, clear
+};
+
 // Soft coast + sea tones for flat mode.
 const FLAT_SAND = "#efdca8";
 const FLAT_SHALLOW = "#6fdbec";
@@ -126,6 +134,35 @@ export function HexBoard({
   const gestureRef = useRef<Gesture>(null);
 
   const graph = useMemo(() => buildBoardGraph(state.tiles, TILE_SIZE), [state.tiles]);
+
+  // Track what was already on the board last render so newly-appearing things can
+  // play a one-shot entrance animation (tile flip, number-token drop, build pop).
+  // We read the ref DURING render to know the previous set, then sync it AFTER
+  // commit — so the "just changed" flag is true only on the first render that
+  // shows the change, and clears itself on every render afterwards.
+  const prevRevealed = useRef<Set<string>>(new Set());
+  const prevNumbered = useRef<Set<string>>(new Set());
+  const prevBuildings = useRef<Set<string>>(new Set());
+  const prevRoads = useRef<Set<string>>(new Set());
+
+  const curRevealed = new Set(state.tiles.filter((t) => t.revealed).map((t) => axialKey(t.coord)));
+  const curNumbered = new Set(
+    state.tiles.filter((t) => t.revealed && t.numberRevealed && t.numberToken !== null).map((t) => axialKey(t.coord))
+  );
+  const curBuildings = new Set(state.buildings.map((b) => vertexKey(b.vertex)));
+  const curRoads = new Set(state.roads.map((r) => edgeKey(r.edge)));
+
+  const justRevealed = (key: string) => curRevealed.has(key) && !prevRevealed.current.has(key);
+  const justNumbered = (key: string) => curNumbered.has(key) && !prevNumbered.current.has(key);
+  const justBuilt = (key: string) => curBuildings.has(key) && !prevBuildings.current.has(key);
+  const justRoaded = (key: string) => curRoads.has(key) && !prevRoads.current.has(key);
+
+  useEffect(() => {
+    prevRevealed.current = curRevealed;
+    prevNumbered.current = curNumbered;
+    prevBuildings.current = curBuildings;
+    prevRoads.current = curRoads;
+  });
 
   const restartGesture = () => {
     const points = Array.from(pointersRef.current.values());
@@ -259,6 +296,20 @@ export function HexBoard({
       <rect x={0} y={0} width="100%" height="100%" fill={FLAT ? "url(#seaGradient)" : "url(#water)"} />
       {FLAT && <rect x={0} y={0} width="100%" height="100%" fill="url(#seaZacken)" />}
       <rect x={0} y={0} width="100%" height="100%" fill="url(#waterVignette)" />
+      {/* The weather in force tints the whole board: a dry heat-haze for drought,
+          a dark squall for storms, a warm golden glow for a bounty, cool and
+          clear for fair weather. Purely atmospheric — sits under every piece. */}
+      {state.weather && WEATHER_TINT[state.weather.kind] && (
+        <rect
+          x={0}
+          y={0}
+          width="100%"
+          height="100%"
+          fill={WEATHER_TINT[state.weather.kind]}
+          pointerEvents="none"
+          className="weather-tint"
+        />
+      )}
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
         <CoastLayer tiles={state.tiles} scale={view.scale} />
         {state.tiles.map((tile) => {
@@ -274,6 +325,8 @@ export function HexBoard({
               onInspect={inspect}
               harvesting={harvestValue !== null && tile.revealed && tile.numberRevealed && tile.numberToken === harvestValue}
               harvestKey={harvestKey}
+              justRevealed={justRevealed(axialKey(tile.coord))}
+              justNumbered={justNumbered(axialKey(tile.coord))}
             />
           );
         })}
@@ -320,14 +373,17 @@ export function HexBoard({
         {/* Roads first, so a settlement/city always sits on top of its roads. */}
         {state.roads.map((road) => {
           const owner = state.players.find((p) => p.id === road.ownerId);
+          const a = scalePoint(road.edge.a, view.scale);
+          const b = scalePoint(road.edge.b, view.scale);
+          const isNew = justRoaded(edgeKey(road.edge));
           return (
-            <RoadPlanks
+            <g
               key={edgeKey(road.edge)}
-              a={scalePoint(road.edge.a, view.scale)}
-              b={scalePoint(road.edge.b, view.scale)}
-              size={view.scale}
-              color={owner?.color ?? "#fff"}
-            />
+              className={isNew ? "build-pop" : undefined}
+              style={isNew ? { transformOrigin: `${(a.x + b.x) / 2}px ${(a.y + b.y) / 2}px` } : undefined}
+            >
+              <RoadPlanks a={a} b={b} size={view.scale} color={owner?.color ?? "#fff"} />
+            </g>
           );
         })}
 
@@ -394,7 +450,12 @@ export function HexBoard({
                 </g>
               )}
               {building && (
-                <BuildingSprite type={building.type} cx={p.x} cy={p.y} size={view.scale} color={owner?.color ?? "#fff"} />
+                <g
+                  className={justBuilt(vk) ? "build-pop" : undefined}
+                  style={justBuilt(vk) ? { transformOrigin: `${p.x}px ${p.y}px` } : undefined}
+                >
+                  <BuildingSprite type={building.type} cx={p.x} cy={p.y} size={view.scale} color={owner?.color ?? "#fff"} />
+                </g>
               )}
               {specialHere && (
                 <SpecialBuildingSprite type={specialHere.id} cx={p.x} cy={p.y} size={view.scale} color={specialOwner?.color} />
@@ -1033,6 +1094,8 @@ function TilePiece({
   onInspect,
   harvesting,
   harvestKey,
+  justRevealed,
+  justNumbered,
 }: {
   tile: Tile;
   center: { x: number; y: number };
@@ -1042,6 +1105,8 @@ function TilePiece({
   onInspect?: (info: MapInfo) => void;
   harvesting: boolean;
   harvestKey: string;
+  justRevealed: boolean;
+  justNumbered: boolean;
 }) {
   const points = tilePolygonPoints(center, size * 0.97);
   // A scouted tile shows its terrain only to the player who paid for the look,
@@ -1056,7 +1121,11 @@ function TilePiece({
     : "#1b263b";
 
   return (
-    <g onClick={onClickTile} className="tile-group">
+    <g
+      onClick={onClickTile}
+      className={`tile-group${justRevealed ? " tile-reveal" : ""}`}
+      style={justRevealed ? { transformOrigin: `${center.x}px ${center.y}px` } : undefined}
+    >
       <polygon
         points={points}
         fill={fill}
@@ -1117,7 +1186,12 @@ function TilePiece({
         />
       )}
       {tile.revealed && tile.numberRevealed && tile.numberToken !== null && (
-        <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
+        <g
+          className={justNumbered ? "number-drop" : undefined}
+          style={justNumbered ? { transformOrigin: `${center.x}px ${center.y}px` } : undefined}
+        >
+          <NumberChipAt value={tile.numberToken} x={center.x} y={center.y} size={size * 0.62} />
+        </g>
       )}
       {tile.revealed && tile.port && <PortBerth tile={tile} center={center} size={size} onInspect={onInspect} />}
     </g>

@@ -594,7 +594,12 @@ body {
   text-align: center;
   pointer-events: none;
   animation: turn-popup-in-out 2.5s ease forwards;
-  white-space: nowrap;
+  /* Long lines (e.g. "Orange erhält 2 Holz, 1 Erz …") must wrap and stay on
+     screen instead of running past the edges. */
+  max-width: min(86vw, 360px);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 @keyframes turn-popup-in-out {
@@ -846,6 +851,43 @@ body {
 .log-toggle-arrow {
   flex-shrink: 0;
   color: #f4a261;
+}
+
+/* Collapsed log: a 3-line rolling preview, newest at the bottom, each line
+   clipped to one row so a short chat stays readable at a glance. */
+.log-preview {
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: #a8dadc;
+  font-size: 0.8rem;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+}
+.log-preview-lines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.log-preview-lines .log-line,
+.log-preview-lines .log-round-inline {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.log-preview-lines .log-line.chat {
+  color: #d7f0f2;
+}
+.log-preview-lines .log-round-inline {
+  color: #6b8f94;
+  font-style: italic;
 }
 
 .log-entries {
@@ -1179,6 +1221,25 @@ body {
 }
 .pt-chip:disabled {
   cursor: default;
+}
+
+/* One-time hint above the turn bar teaching the double-tap-to-trade gesture. */
+.trade-hint {
+  position: absolute;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 22;
+  max-width: calc(100% - 24px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(42, 157, 143, 0.95);
+  color: #04231f;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
 }
 
 .player-menu button {
@@ -1776,12 +1837,14 @@ body {
   justify-content: center;
 }
 
-/* Dice in the bottom-left corner of the map (mirror of the recenter button). */
+/* Dice sit centred just above the turn bar (which lives at the very bottom),
+   so the two never overlap. */
 .map-dice {
   position: absolute;
-  left: 10px;
-  bottom: 10px;
-  z-index: 20;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 52px;
+  z-index: 21;
 }
 .map-dice-result {
   display: flex;

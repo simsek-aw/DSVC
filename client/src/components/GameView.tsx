@@ -480,7 +480,43 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     prevStealRef.current = state.pendingSteal;
   }, [state.pendingSteal]);
 
-  const latestLogEntry = state.log[state.log.length - 1] ?? "";
+  // A trade is started by DOUBLE-tapping a player's chip (single taps are too
+  // easy to trigger by accident). We show a one-time hint the first time.
+  const lastChipTapRef = useRef<{ id: string; at: number } | null>(null);
+  const [tradeHintSeen, setTradeHintSeen] = useState(() => {
+    try {
+      return localStorage.getItem("canos_trade_hint") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const markTradeHintSeen = () => {
+    setTradeHintSeen(true);
+    try {
+      localStorage.setItem("canos_trade_hint", "1");
+    } catch {
+      /* ignore */
+    }
+  };
+  const onChipDoubleTap = (pid: string) => {
+    const now = Date.now();
+    const prev = lastChipTapRef.current;
+    if (prev && prev.id === pid && now - prev.at < 450) {
+      lastChipTapRef.current = null;
+      markTradeHintSeen();
+      sendAction({ type: "startNegotiation", withPlayerId: pid });
+    } else {
+      lastChipTapRef.current = { id: pid, at: now };
+    }
+  };
+  // Auto-dismiss the one-time hint after a few seconds even if untouched.
+  const someTradable =
+    state.phase === "mainGame" && !state.negotiation && state.players.some((p) => p.id !== myPlayerId);
+  useEffect(() => {
+    if (tradeHintSeen || !someTradable) return;
+    const t = setTimeout(markTradeHintSeen, 7000);
+    return () => clearTimeout(t);
+  }, [tradeHintSeen, someTradable]);
 
   // Double-tap on one of my own resource tiles shouts "I need this" to the
   // table. Detected manually rather than via onDoubleClick so it behaves the
@@ -629,8 +665,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                       className={`pt-chip ${isCurrent ? "current" : ""} ${isMe ? "me" : ""} ${canTrade ? "tradable" : ""}`}
                       style={{ borderColor: p.color, background: isCurrent ? p.color : undefined }}
                       disabled={isMe}
-                      onClick={() => canTrade && sendAction({ type: "startNegotiation", withPlayerId: p.id })}
-                      title={isMe ? p.name : canTrade ? `Mit ${p.name} traden` : p.name}
+                      onPointerDown={() => canTrade && onChipDoubleTap(p.id)}
+                      title={isMe ? p.name : canTrade ? `Doppeltippen zum Traden mit ${p.name}` : p.name}
                     >
                       <span className="pt-dot" style={{ background: p.color }} />
                       <span className="pt-name">{p.name}</span>
@@ -643,6 +679,11 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                 );
               },
             )}
+          </div>
+        )}
+        {!tradeHintSeen && someTradable && (
+          <div className="trade-hint" role="status">
+            👆 Doppeltippe einen Mitspieler zum Traden
           </div>
         )}
         {state.weather && (
@@ -856,27 +897,45 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         {/* Log and chat are one stream: messages land where players already
             look for events, and the input sits right underneath. */}
         <div className="log-panel">
-          <button className="log-header" onClick={() => setLogExpanded((v) => !v)}>
-            <span className="log-latest">{latestLogEntry}</span>
-            <span className="log-toggle-arrow">{logExpanded ? "▾" : "▸"}</span>
-          </button>
-          {logExpanded && (
-            <div className="log-entries">
-              {state.log
-                .slice(-40)
-                .reverse()
-                .map((entry, i) =>
+          {/* Collapsed: a 3-line rolling preview (newest at the bottom) so a
+              short chat stays readable without opening the full history. */}
+          {!logExpanded && (
+            <button className="log-preview" onClick={() => setLogExpanded(true)} title="Verlauf & Chat öffnen">
+              <span className="log-preview-lines">
+                {state.log.slice(-3).map((entry, i) =>
                   entry.startsWith(ROUND_MARKER) ? (
-                    <div key={i} className="log-round">
-                      {entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}
-                    </div>
+                    <span key={i} className="log-round-inline">{entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}</span>
                   ) : (
-                    <div key={i} className={`log-entry ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>
-                      {entry}
-                    </div>
+                    <span key={i} className={`log-line ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>{entry}</span>
                   ),
                 )}
-            </div>
+              </span>
+              <span className="log-toggle-arrow">▸</span>
+            </button>
+          )}
+          {logExpanded && (
+            <>
+              <button className="log-header" onClick={() => setLogExpanded(false)}>
+                <span className="log-latest">Verlauf &amp; Chat</span>
+                <span className="log-toggle-arrow">▾</span>
+              </button>
+              <div className="log-entries">
+                {state.log
+                  .slice(-40)
+                  .reverse()
+                  .map((entry, i) =>
+                    entry.startsWith(ROUND_MARKER) ? (
+                      <div key={i} className="log-round">
+                        {entry.replace(new RegExp(`^${ROUND_MARKER}\\s*`), "")}
+                      </div>
+                    ) : (
+                      <div key={i} className={`log-entry ${entry.startsWith(CHAT_PREFIX) ? "chat" : ""}`}>
+                        {entry}
+                      </div>
+                    ),
+                  )}
+              </div>
+            </>
           )}
           <form
             className="chat-row"

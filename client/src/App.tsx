@@ -21,10 +21,27 @@ function loadSession(): Session | null {
   }
 }
 
+interface Toast {
+  id: number;
+  kind: "error" | "info" | "success";
+  text: string;
+}
+
+let toastSeq = 0;
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession());
   const [state, setState] = useState<GameState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // A small stacked-toast system: server errors and local notices land here as
+  // dismissible cards that auto-expire, instead of failing silently.
+  const pushToast = useRef((kind: Toast["kind"], text: string) => {
+    const id = ++toastSeq;
+    setToasts((cur) => [...cur.slice(-3), { id, kind, text }]);
+    setTimeout(() => setToasts((cur) => cur.filter((t) => t.id !== id)), kind === "error" ? 4500 : 2600);
+  });
+  const dismissToast = (id: number) => setToasts((cur) => cur.filter((t) => t.id !== id));
   // True only once the CURRENT socket connection has confirmed which player
   // it is (via "joined", from createRoom/joinRoom/rejoin). False in between —
   // e.g. right after a reconnect, before "rejoin" round-trips — so actions
@@ -57,8 +74,7 @@ export default function App() {
       setIdentityConfirmed(false);
     };
     const onError = (msg: string) => {
-      setError(msg);
-      setTimeout(() => setError(null), 4000);
+      pushToast.current("error", msg);
       // A stale session (e.g. the server restarted and forgot every room)
       // otherwise leaves the app stuck forever on "Verbinde …" — fall back
       // to the lobby so a new room can be created or joined.
@@ -116,8 +132,7 @@ export default function App() {
   const sendAction = (action: any) => {
     if (!session) return;
     if (!identityConfirmed) {
-      setError("Verbindung wird wiederhergestellt, bitte kurz warten …");
-      setTimeout(() => setError(null), 3000);
+      pushToast.current("info", "Verbindung wird wiederhergestellt, bitte kurz warten …");
       return;
     }
     socket.emit("action", {
@@ -137,7 +152,18 @@ export default function App() {
 
   return (
     <div className="app-root">
-      {error && <div className="toast-error">{error}</div>}
+      {toasts.length > 0 && (
+        <div className="toast-stack">
+          {toasts.map((t) => (
+            <div key={t.id} className={`toast toast-${t.kind}`} onClick={() => dismissToast(t.id)} role="status">
+              <span className="toast-icon" aria-hidden="true">
+                {t.kind === "error" ? "⚠️" : t.kind === "success" ? "✅" : "ℹ️"}
+              </span>
+              <span>{t.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {!session && <Lobby />}
       {session && !state && <div className="centered-message">Verbinde …</div>}
       {session && state && !identityConfirmed && <div className="reconnect-banner">Verbindung wird wiederhergestellt …</div>}

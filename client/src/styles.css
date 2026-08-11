@@ -1134,16 +1134,45 @@ body {
   font-size: 0.85rem;
 }
 
-.toast-error {
+.toast-stack {
   position: fixed;
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  background: #e63946;
-  color: #fff;
-  padding: 10px 16px;
-  border-radius: 10px;
   z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  width: min(92vw, 420px);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  max-width: 100%;
+  animation: toast-in 0.28s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+
+.toast-icon { flex-shrink: 0; }
+
+.toast-error { background: #d13544; }
+.toast-info { background: #2a6f7f; }
+.toast-success { background: #2a9d8f; color: #06231f; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .reconnect-banner {
@@ -2596,4 +2625,17 @@ body {
 @keyframes robber-sway {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50% { transform: translateY(-1.5px) rotate(2deg); }
+}
+
+/* Zug-Ende im Rückgängig-Fenster: warnende Farbe + Puls, damit klar ist,
+   dass gleich committet wird. */
+.primary-button.undo-end {
+  background: #e9873a;
+  color: #241203;
+  animation: undo-pulse 0.7s ease-in-out infinite;
+}
+
+@keyframes undo-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
 }

@@ -58,6 +58,27 @@ function sameName(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+// Simple per-socket sliding-window rate limit, so a buggy or hostile client
+// can't flood the room with actions (each one triggers a persist + broadcast).
+const RATE_WINDOW_MS = 2000;
+const RATE_MAX = 25;
+const actionTimes = new Map<string, number[]>();
+function rateLimited(socketId: string): boolean {
+  const now = Date.now();
+  const recent = (actionTimes.get(socketId) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+  recent.push(now);
+  actionTimes.set(socketId, recent);
+  return recent.length > RATE_MAX;
+}
+
+// Shape check before the pure engine ever sees the payload: it must be a plain
+// object carrying a string `type`. Blocks malformed/oversized junk early.
+function isValidAction(action: unknown): action is { type: string } {
+  if (typeof action !== "object" || action === null || Array.isArray(action)) return false;
+  const type = (action as Record<string, unknown>).type;
+  return typeof type === "string" && type.length > 0 && type.length <= 64;
+}
+
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ playerName }: { playerName: string }) => {
     const roomId = generateRoomId();
@@ -158,6 +179,18 @@ io.on("connection", (socket) => {
   });
 
   socket.on("action", ({ roomId, action, asPlayerId }: { roomId: string; action: any; asPlayerId?: string }) => {
+    if (typeof roomId !== "string" || !roomId) {
+      socket.emit("errorMessage", "Ungültige Anfrage.");
+      return;
+    }
+    if (!isValidAction(action)) {
+      socket.emit("errorMessage", "Ungültige Aktion.");
+      return;
+    }
+    if (rateLimited(socket.id)) {
+      socket.emit("errorMessage", "Zu viele Aktionen — bitte kurz durchatmen.");
+      return;
+    }
     const state = getRoom(roomId);
     if (!state) {
       socket.emit("errorMessage", "Raum nicht gefunden.");
@@ -178,7 +211,7 @@ io.on("connection", (socket) => {
       return;
     }
     try {
-      const next = applyAction(state, playerId, action);
+      const next = applyAction(state, playerId, action as any);
       saveRoom(next);
       broadcastState(roomId);
     } catch (err) {
@@ -187,6 +220,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    actionTimes.delete(socket.id);
     const playerId = (socket as any).canosPlayerId;
     if (!playerId) return;
     for (const roomId of socket.rooms) {

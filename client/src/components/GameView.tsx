@@ -155,6 +155,10 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
   const [chatDraft, setChatDraft] = useState("");
   const [setupNoteDismissed, setSetupNoteDismissed] = useState(false);
   const [vpPeek, setVpPeek] = useState<{ id: string; vp: number } | null>(null);
+  // Zug-Ende mit kurzem Rückgängig-Fenster: nach dem Tippen läuft ein
+  // Countdown, in dem man den Zug noch stoppen kann, bevor er committet wird.
+  const [endCountdown, setEndCountdown] = useState<number | null>(null);
+  const endTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const me = state.players.find((p) => p.id === myPlayerId);
   const currentPlayerId = state.turnOrder[state.currentPlayerIndex];
@@ -231,6 +235,37 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
     setBuildMode(null);
     setFreeRoadEdges([]);
   };
+
+  // Zug beenden mit Rückgängig-Fenster: der erste Tipp startet einen 3-2-1
+  // Countdown; erst wenn er ausläuft, geht der Zug wirklich raus. Ein zweiter
+  // Tipp (jetzt „Rückgängig") bricht ab. Ein Bau/Handel währenddessen zählt als
+  // „doch nicht beenden" und stoppt den Countdown ebenfalls.
+  const clearEndTimer = () => {
+    if (endTimerRef.current) {
+      clearInterval(endTimerRef.current);
+      endTimerRef.current = null;
+    }
+  };
+  const startEndTurn = () => {
+    clearEndTimer();
+    setEndCountdown(3);
+    endTimerRef.current = setInterval(() => {
+      setEndCountdown((n) => {
+        if (n === null) return null;
+        if (n <= 1) {
+          clearEndTimer();
+          sendAction({ type: "endTurn" });
+          return null;
+        }
+        return n - 1;
+      });
+    }, 700);
+  };
+  const cancelEndTurn = () => {
+    clearEndTimer();
+    setEndCountdown(null);
+  };
+  useEffect(() => () => clearEndTimer(), []);
 
   // Safety net: never leave a build/aim mode (and its hint) hanging once it's
   // no longer my turn.
@@ -1285,7 +1320,10 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                   className={`build-toggle ${
                     showBuild ? "toggle-active" : affordableBuildCount > 0 ? "can-build" : "dimmed"
                   }`}
-                  onClick={() => setShowBuild((v) => !v)}
+                  onClick={() => {
+                    cancelEndTurn();
+                    setShowBuild((v) => !v);
+                  }}
                   title={
                     affordableBuildCount > 0
                       ? "Du kannst gerade etwas bauen"
@@ -1295,15 +1333,21 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                   🔨 Bauen
                   {!showBuild && affordableBuildCount > 0 && <span className="can-build-dot" aria-hidden="true" />}
                 </button>
-                <button className={showCards ? "toggle-active" : ""} onClick={() => setShowCards((v) => !v)}>
+                <button className={showCards ? "toggle-active" : ""} onClick={() => { cancelEndTurn(); setShowCards((v) => !v); }}>
                   🃏 Karten ({me?.developmentCards.length ?? 0})
                 </button>
-                <button className={showTradePanel ? "toggle-active" : ""} onClick={() => setShowTradePanel((v) => !v)}>
+                <button className={showTradePanel ? "toggle-active" : ""} onClick={() => { cancelEndTurn(); setShowTradePanel((v) => !v); }}>
                   🔁 Handel
                 </button>
-                <button className="primary-button" onClick={() => sendAction({ type: "endTurn" })}>
-                  Zug beenden
-                </button>
+                {endCountdown === null ? (
+                  <button className="primary-button" onClick={startEndTurn}>
+                    Zug beenden
+                  </button>
+                ) : (
+                  <button className="primary-button undo-end" onClick={cancelEndTurn}>
+                    ↩︎ Rückgängig ({endCountdown})
+                  </button>
+                )}
               </div>
             </>
           )}

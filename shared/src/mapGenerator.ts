@@ -1,10 +1,27 @@
 import { AxialCoord, VertexId, axialKey, axialNeighbors, tileVertices, vertexKey } from "./hexGrid";
 import { ResourceType, Tile } from "./types";
 
+// A seedable PRNG so a given seed always produces the exact same island — that
+// is what makes "same-map rematch" possible. `rng` is the module-wide source of
+// randomness; generateMap swaps in a seeded one at the top of each run and
+// restores Math.random afterwards, so nothing else in the app is affected.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let rng: () => number = Math.random;
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -12,7 +29,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function pickWeighted(weights: [number, number][]): number {
   const total = weights.reduce((s, [, w]) => s + w, 0);
-  let roll = Math.random() * total;
+  let roll = rng() * total;
   for (const [value, w] of weights) {
     if (roll < w) return value;
     roll -= w;
@@ -36,14 +53,14 @@ function growBlob(count: number): AxialCoord[] {
         if (placed.has(key)) continue;
         const existingNeighbors = axialNeighbors(n).filter((nn) => placed.has(axialKey(nn))).length;
         // Favor low-neighbor-count spots so the shape grows lobes rather than a perfect circle.
-        const score = 1 / (1 + existingNeighbors) + Math.random() * 0.6;
+        const score = 1 / (1 + existingNeighbors) + rng() * 0.6;
         frontier.push({ coord: n, score });
       }
     }
     if (frontier.length === 0) break;
     frontier.sort((a, b) => b.score - a.score);
     const topSlice = frontier.slice(0, Math.max(1, Math.floor(frontier.length * 0.4)));
-    const chosen = topSlice[Math.floor(Math.random() * topSlice.length)];
+    const chosen = topSlice[Math.floor(rng() * topSlice.length)];
     placed.set(axialKey(chosen.coord), chosen.coord);
   }
   return Array.from(placed.values());
@@ -170,13 +187,32 @@ function numberTokenPool(landTileCount: number): number[] {
 export interface MapGenOptions {
   playerCount: number;
   tileSize?: number;
+  // A 32-bit seed. Same seed + same playerCount → byte-identical island, so a
+  // group can rematch on a board they liked. Omit for a fresh random map.
+  seed?: number;
 }
 
 export interface GeneratedMap {
   tiles: Tile[];
+  // The seed actually used, so it can be stored and replayed later.
+  seed: number;
 }
 
 export function generateMap(options: MapGenOptions): GeneratedMap {
+  const { playerCount } = options;
+  // Seed the PRNG for this run (random seed when none was supplied), and always
+  // restore Math.random on the way out so no other code is left deterministic.
+  const seed = (options.seed ?? Math.floor(Math.random() * 0xffffffff)) >>> 0;
+  const prevRng = rng;
+  rng = mulberry32(seed);
+  try {
+    return { ...buildMap(options), seed };
+  } finally {
+    rng = prevRng;
+  }
+}
+
+function buildMap(options: MapGenOptions): { tiles: Tile[] } {
   const { playerCount } = options;
   // Never too big: base 19 (4p classic), + a few tiles per extra player, capped.
   const tileCount = Math.min(19 + Math.max(0, playerCount - 4) * 5, 30);
@@ -215,14 +251,14 @@ export function generateMap(options: MapGenOptions): GeneratedMap {
 
   // Place the classic robber on the desert if present, otherwise a random tile.
   if (!tiles.some((t) => t.hasClassicRobber)) {
-    tiles[Math.floor(Math.random() * tiles.length)].hasClassicRobber = true;
+    tiles[Math.floor(rng() * tiles.length)].hasClassicRobber = true;
   }
 
   // Place the single, fixed Boost figure on a random non-desert, non-classic-robber tile.
   // It stays hidden (like the tile beneath it) until a settlement reveals it.
   const candidatesForBoost = tiles.filter((t) => !t.hasClassicRobber && t.terrain !== "desert");
   if (candidatesForBoost.length > 0) {
-    candidatesForBoost[Math.floor(Math.random() * candidatesForBoost.length)].hasBoostToken = true;
+    candidatesForBoost[Math.floor(rng() * candidatesForBoost.length)].hasBoostToken = true;
   }
 
   // Ports sit on the open coast: on the edge a tile actually shares with the

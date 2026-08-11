@@ -11,10 +11,31 @@ interface Props {
   onLeave: () => void;
 }
 
+const SCENARIOS: { name: string; icon: string; settings: { secretObjectives: boolean; specialBuildings: boolean; knightForcesDiscard: boolean } }[] = [
+  { name: "Klassisch", icon: "🎲", settings: { secretObjectives: false, specialBuildings: false, knightForcesDiscard: false } },
+  { name: "Missionen", icon: "🎯", settings: { secretObjectives: true, specialBuildings: false, knightForcesDiscard: false } },
+  { name: "Chaos", icon: "🌪️", settings: { secretObjectives: true, specialBuildings: true, knightForcesDiscard: true } },
+];
+
 export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: Props) {
   const isHost = state.players[0]?.id === myPlayerId;
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [manualLink, setManualLink] = useState<string | null>(null);
+  const [seedText, setSeedText] = useState("");
+
+  const applySeed = (text: string) => {
+    setSeedText(text);
+    const trimmed = text.trim();
+    const seed = trimmed === "" ? undefined : Math.abs(parseInt(trimmed, 10)) >>> 0;
+    sendAction({ type: "setRoomSettings", settings: { mapSeed: Number.isFinite(seed as number) ? seed : undefined } });
+  };
+
+  const activeScenario = SCENARIOS.find(
+    (sc) =>
+      sc.settings.secretObjectives === state.settings.secretObjectives &&
+      sc.settings.specialBuildings === state.settings.specialBuildings &&
+      sc.settings.knightForcesDiscard === state.settings.knightForcesDiscard,
+  );
 
   const onShare = async () => {
     const res = await shareInvite(roomId);
@@ -61,6 +82,20 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
       <p className="hint">{state.players.length} / 6 Spieler</p>
 
       <div className="room-settings">
+        <p className="room-settings-title">Szenario</p>
+        <div className="scenario-row">
+          {SCENARIOS.map((sc) => (
+            <button
+              key={sc.name}
+              className={`scenario-chip ${activeScenario?.name === sc.name ? "active" : ""}`}
+              disabled={!isHost}
+              onClick={() => sendAction({ type: "setRoomSettings", settings: sc.settings })}
+            >
+              {sc.icon} {sc.name}
+            </button>
+          ))}
+        </div>
+
         <p className="room-settings-title">Zusatzregeln</p>
         <label className={`room-toggle ${!isHost ? "readonly" : ""}`}>
           <input
@@ -97,6 +132,23 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
             <strong>⚔️ Ritter erzwingt Abwerfen</strong>
             <span className="hint">Hausregel: Auch beim Ausspielen eines Ritters wirft jeder mit mehr als 7 Karten die Hälfte ab (sonst nur bei einer gewürfelten 7).</span>
           </span>
+        </label>
+
+        <label className={`room-toggle seed-row ${!isHost ? "readonly" : ""}`}>
+          <span className="room-toggle-text">
+            <strong>🗺️ Karten-Seed</strong>
+            <span className="hint">Leer lassen für eine zufällige Insel — oder einen Seed eintragen, um eine bestimmte Karte erneut zu spielen.</span>
+          </span>
+          <input
+            className="seed-input"
+            type="text"
+            inputMode="numeric"
+            placeholder="zufällig"
+            value={seedText}
+            disabled={!isHost}
+            onChange={(e) => applySeed(e.target.value)}
+            aria-label="Karten-Seed"
+          />
         </label>
       </div>
 

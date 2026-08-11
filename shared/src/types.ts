@@ -145,6 +145,7 @@ export interface GameSettings {
   secretObjectives: boolean; // deal each player a hidden mission worth extra VP
   specialBuildings: boolean; // reserved for the special-buildings layer
   knightForcesDiscard: boolean; // house rule: playing a knight also forces the >7 discard
+  mapSeed?: number; // optional fixed seed so a group can rematch the same island
 }
 
 export function defaultSettings(): GameSettings {
@@ -269,6 +270,9 @@ export interface GameState {
   roundCount: number;
   weather: WeatherEvent | null;
   settings: GameSettings;
+  // The seed the current island was generated from — shown to players and
+  // reusable to rematch the exact same board. 0 until the game starts.
+  mapSeed: number;
   // Recent emoji reactions (capped tail) plus a monotonic counter so every
   // reaction is shown exactly once on each client, even after the tail is pruned.
   reactions: Reaction[];

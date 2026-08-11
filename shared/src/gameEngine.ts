@@ -100,6 +100,7 @@ export function createLobby(roomId: string): GameState {
     roundCount: 0,
     weather: null,
     settings: defaultSettings(),
+    mapSeed: 0,
     reactions: [],
     reactionSeq: 0,
     log: [],
@@ -294,7 +295,11 @@ export function viewFor(state: GameState, playerId: string): GameState {
 export function startGame(state: GameState): GameState {
   if (state.phase !== "lobby") throw new GameError("Spiel wurde bereits gestartet.");
   if (state.players.length < 2) throw new GameError("Mindestens 2 Spieler nötig.");
-  const { tiles } = generateMap({ playerCount: state.players.length, tileSize: TILE_SIZE });
+  const { tiles, seed } = generateMap({
+    playerCount: state.players.length,
+    tileSize: TILE_SIZE,
+    seed: state.settings.mapSeed,
+  });
   // Deal one face-down mission per player when the room enabled them. The deck
   // is reshuffled and cycled so every player gets one even at a full table.
   let players = state.players;
@@ -309,6 +314,7 @@ export function startGame(state: GameState): GameState {
     phase: "turnOrderRoll",
     tiles,
     players,
+    mapSeed: seed,
     developmentDeck: buildDevelopmentDeck(),
     log,
   };

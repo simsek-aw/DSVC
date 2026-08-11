@@ -2639,3 +2639,50 @@ body {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.18); }
 }
+
+/* Szenario-Presets + Karten-Seed in der Lobby. */
+.scenario-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.scenario-chip {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #2a4a4f;
+  background: #142c30;
+  color: #cdeef0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scenario-chip.active {
+  border-color: #2a9d8f;
+  background: #14453f;
+  color: #d8f3ec;
+}
+
+.scenario-chip:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.seed-row {
+  align-items: center;
+}
+
+.seed-input {
+  width: 96px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #2a4a4f;
+  background: #0f2529;
+  color: #fff;
+  font-size: 0.9rem;
+  text-align: center;
+}

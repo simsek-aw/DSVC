@@ -84,6 +84,30 @@ interface Flight {
 }
 const FLIGHT_MS = 620;
 
+// Downloads the full game log (plus the map seed for reproducibility) as a text
+// file, so a memorable game can be kept or a bug reported with the exact run.
+function exportLog(state: GameState) {
+  const header = [
+    `Canos Incognita — Spielverlauf`,
+    `Raum: ${state.roomId}`,
+    `Karten-Seed: ${state.mapSeed}`,
+    `Spieler: ${state.players.map((p) => p.name).join(", ")}`,
+    ``,
+  ];
+  const body = [...header, ...state.log].join("\n");
+  try {
+    const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `canos-${state.roomId}-${state.mapSeed}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch {
+    /* download unsupported — silently ignore */
+  }
+}
+
 function FlyingSprite({ flight }: { flight: Flight }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -872,6 +896,24 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                 }}
               >
                 🔗 Einladungslink teilen
+              </button>
+              {state.mapSeed > 0 && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(String(state.mapSeed)).catch(() => {});
+                  }}
+                  title="Karten-Seed kopieren — für ein Rematch auf derselben Insel in einen neuen Raum eintragen"
+                >
+                  🗺️ Karten-Seed: {state.mapSeed} 📋
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  exportLog(state);
+                }}
+              >
+                📄 Spielverlauf exportieren
               </button>
               {"Notification" in window && (
                 <button

@@ -15,7 +15,7 @@ import {
   setPlayerConnected,
   viewFor,
 } from "@canos/shared";
-import { deleteRoom, getRoom, loadAllRoomsFromDisk, saveRoom } from "./roomStore";
+import { deleteRoom, getRoom, loadAllRoomsFromDisk, saveRoom, sweepStaleRooms } from "./roomStore";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
@@ -35,6 +35,14 @@ app.get("*", (_req, res) => {
 });
 
 loadAllRoomsFromDisk();
+
+// Clean up long-dead rooms on boot and hourly thereafter (default TTL: 48h).
+const ROOM_TTL_MS = Number(process.env.ROOM_TTL_MS ?? 48 * 60 * 60 * 1000);
+sweepStaleRooms(ROOM_TTL_MS);
+setInterval(() => {
+  const removed = sweepStaleRooms(ROOM_TTL_MS);
+  if (removed) console.log(`Room cleanup: removed ${removed} stale room(s).`);
+}, 60 * 60 * 1000).unref();
 
 const ROOM_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const generateRoomId = customAlphabet(ROOM_ID_ALPHABET, 5);

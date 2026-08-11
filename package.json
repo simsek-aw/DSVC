@@ -11,6 +11,9 @@
     "build:shared": "npm run build -w shared",
     "dev:server": "npm run build:shared && npm run dev -w server",
     "dev:client": "npm run dev -w client",
-    "build": "npm run build:shared && npm run build -w server && npm run build -w client"
+    "build": "npm run build:shared && npm run build -w server && npm run build -w client",
+    "test:unit": "for f in shared/test-*.mjs; do echo \"— $f\"; node \"$f\" || exit 1; done",
+    "test:e2e": "node e2e/smoke.mjs",
+    "test": "npm run test:unit && npm run test:e2e"
   }
 }

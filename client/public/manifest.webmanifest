@@ -1,0 +1,14 @@
+{
+  "name": "Canos Incognita",
+  "short_name": "Canos",
+  "description": "Ein verdecktes Inselabenteuer für 2–6 Spieler",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1b1e",
+  "theme_color": "#0d1b1e",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

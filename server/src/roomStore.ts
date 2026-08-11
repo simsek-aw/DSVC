@@ -44,3 +44,24 @@ export function deleteRoom(roomId: string): void {
   rooms.delete(roomId);
   fs.unlink(filePathFor(roomId), () => {});
 }
+
+// Drop rooms that haven't been touched in `maxAgeMs`, so long-dead games don't
+// pile up on disk forever. The room file's mtime is bumped on every saveRoom,
+// so it doubles as a last-activity clock that survives a server restart.
+export function sweepStaleRooms(maxAgeMs: number): number {
+  const now = Date.now();
+  let removed = 0;
+  for (const roomId of Array.from(rooms.keys())) {
+    let mtimeMs: number;
+    try {
+      mtimeMs = fs.statSync(filePathFor(roomId)).mtimeMs;
+    } catch {
+      continue; // no file on disk yet — leave the in-memory room alone
+    }
+    if (now - mtimeMs > maxAgeMs) {
+      deleteRoom(roomId);
+      removed++;
+    }
+  }
+  return removed;
+}

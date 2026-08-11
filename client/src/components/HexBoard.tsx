@@ -176,6 +176,7 @@ export function HexBoard({
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    cancelFocus(); // a user touch always wins over an auto-pan glide
     try {
       (e.target as Element).setPointerCapture?.(e.pointerId);
     } catch {
@@ -237,6 +238,65 @@ export function HexBoard({
     const cy = (minY + maxY) / 2;
     setView({ scale, x: -cx * scale, y: -cy * scale });
   };
+
+  // Gentle auto-pan: glide the board so a given board-unit point lands in the
+  // centre. Used to follow other players' big moves (robber, a fresh foreign
+  // settlement) so you never miss them off-screen. A user pan cancels it.
+  const focusAnimRef = useRef<number | null>(null);
+  const cancelFocus = () => {
+    if (focusAnimRef.current !== null) {
+      cancelAnimationFrame(focusAnimRef.current);
+      focusAnimRef.current = null;
+    }
+  };
+  const focusOnUnit = (ux: number, uy: number) => {
+    const targetX = -ux * view.scale;
+    const targetY = -uy * view.scale;
+    const start = { x: view.x, y: view.y };
+    // Already roughly centred? Don't bother nudging.
+    if (Math.abs(targetX - start.x) < 12 && Math.abs(targetY - start.y) < 12) return;
+    cancelFocus();
+    const t0 = performance.now();
+    const DUR = 640;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / DUR);
+      const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setView((v) => ({ ...v, x: start.x + (targetX - start.x) * e, y: start.y + (targetY - start.y) * e }));
+      focusAnimRef.current = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    focusAnimRef.current = requestAnimationFrame(step);
+  };
+
+  // Track the robber tile and foreign buildings so the camera can follow the
+  // moment either changes because of somebody else's turn.
+  const prevRobberRef = useRef<string | null>(null);
+  const prevForeignRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const robber = state.tiles.find((t) => t.revealed && t.hasClassicRobber)?.coord ?? null;
+    const rk = robber ? axialKey(robber) : null;
+    const foreign = new Set(state.buildings.filter((b) => b.ownerId !== myPlayerId).map((b) => vertexKey(b.vertex)));
+
+    let target: { x: number; y: number } | null = null;
+    // Robber jumped to a new tile (skip the very first sighting on mount).
+    if (rk && rk !== prevRobberRef.current && prevRobberRef.current !== null && robber) {
+      const p = axialToPixel(robber, 1);
+      target = { x: p.x, y: p.y };
+    } else if (prevForeignRef.current) {
+      const fresh = [...foreign].find((k) => !prevForeignRef.current!.has(k));
+      if (fresh) {
+        const b = state.buildings.find((bb) => vertexKey(bb.vertex) === fresh);
+        if (b) target = { x: b.vertex.x, y: b.vertex.y };
+      }
+    }
+
+    prevRobberRef.current = rk;
+    prevForeignRef.current = foreign;
+    // Don't yank the view while the player is mid-gesture or mid-aim.
+    if (target && !gestureRef.current && !aiming) focusOnUnit(target.x, target.y);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.tiles, state.buildings]);
+
+  useEffect(() => cancelFocus, []);
 
   const px = (coord: AxialCoord) => axialToPixel(coord, view.scale);
   const me = state.players.find((p) => p.id === myPlayerId);
@@ -310,6 +370,15 @@ export function HexBoard({
           className="weather-tint"
         />
       )}
+      {/* Ambient life: soft cloud shadows and a couple of gulls drift across the
+          sea in screen space (independent of pan/zoom). Purely decorative. */}
+      <g className="ambient" pointerEvents="none">
+        <ellipse className="cloud-shadow cloud-1" cx={0} cy={90} rx={110} ry={34} />
+        <ellipse className="cloud-shadow cloud-2" cx={0} cy={300} rx={150} ry={44} />
+        <ellipse className="cloud-shadow cloud-3" cx={0} cy={520} rx={90} ry={28} />
+        <path className="gull gull-1" d="M -7 0 Q -3.5 -5 0 0 Q 3.5 -5 7 0" />
+        <path className="gull gull-2" d="M -6 0 Q -3 -4 0 0 Q 3 -4 6 0" />
+      </g>
       <g transform={`translate(${view.x + (svgRef.current?.clientWidth ?? 400) / 2}, ${view.y + (svgRef.current?.clientHeight ?? 400) / 2})`}>
         <CoastLayer tiles={state.tiles} scale={view.scale} />
         {state.tiles.map((tile) => {
@@ -749,7 +818,7 @@ function RobberBubble({
     <g style={{ transform: `translate(${center.x}px, ${center.y}px)` }}>
       <g
         ref={innerRef}
-        className={`map-bubble ${onInspect ? "inspectable" : ""}`}
+        className={`map-bubble robber-idle ${onInspect ? "inspectable" : ""}`}
         onClick={(e) => {
           if (!onInspect) return;
           e.stopPropagation();

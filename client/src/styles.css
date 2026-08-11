@@ -2550,3 +2550,50 @@ body {
 .reaction-emoji:active {
   transform: scale(0.88);
 }
+
+/* ── Ambient life (decorative, non-interactive) ───────────────────────── */
+.ambient { pointer-events: none; }
+
+.cloud-shadow {
+  fill: #0a1a1e;
+  opacity: 0.05;
+}
+.cloud-1 { animation: drift-right 52s linear infinite; }
+.cloud-2 { animation: drift-right 74s linear infinite; animation-delay: -20s; opacity: 0.04; }
+.cloud-3 { animation: drift-right 44s linear infinite; animation-delay: -33s; }
+
+@keyframes drift-right {
+  from { transform: translateX(-260px); }
+  to { transform: translateX(1400px); }
+}
+
+.gull {
+  fill: none;
+  stroke: #f1faee;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+.gull-1 { transform: translateY(150px); animation: gull-glide-1 27s linear infinite; }
+.gull-2 { transform: translateY(400px); animation: gull-glide-2 34s linear infinite; animation-delay: -12s; }
+
+@keyframes gull-glide-1 {
+  0% { transform: translate(-40px, 150px); }
+  50% { transform: translate(700px, 110px); }
+  100% { transform: translate(1440px, 160px); }
+}
+@keyframes gull-glide-2 {
+  0% { transform: translate(1440px, 400px); }
+  50% { transform: translate(680px, 440px); }
+  100% { transform: translate(-40px, 390px); }
+}
+
+/* The classic robber gives a slow, menacing idle sway while it squats on a tile. */
+.robber-idle {
+  animation: robber-sway 3.4s ease-in-out infinite;
+}
+
+@keyframes robber-sway {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-1.5px) rotate(2deg); }
+}

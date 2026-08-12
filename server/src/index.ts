@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import {
   addPlayer,
   applyAction,
+  computeAiActions,
   createDemoLobby,
   createLobby,
   GameError,
@@ -64,6 +65,44 @@ function broadcastState(roomId: string) {
 
 function sameName(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+// ── Solo-KI: drive any AI seats forward on the server ─────────────────────
+// One room is "driven" at a time; each accepted AI action broadcasts and
+// schedules the next, with a short pause so a human can watch it play.
+const AI_STEP_MS = 650;
+const AI_MAX_STEPS = 300; // safety cap for a single continuous drive chain
+const aiDriving = new Set<string>();
+
+function stepAi(roomId: string, steps: number): void {
+  const state = getRoom(roomId);
+  if (!state || state.phase === "ended" || steps > AI_MAX_STEPS) {
+    aiDriving.delete(roomId);
+    return;
+  }
+  for (const p of state.players) {
+    if (!p.isAI) continue;
+    for (const action of computeAiActions(state, p.id)) {
+      try {
+        const next = applyAction(state, p.id, action as any);
+        saveRoom(next);
+        broadcastState(roomId);
+        setTimeout(() => stepAi(roomId, steps + 1), AI_STEP_MS);
+        return;
+      } catch {
+        // Illegal guess — fall through to the bot's next candidate action.
+      }
+    }
+  }
+  aiDriving.delete(roomId); // no AI had anything to do → done for now
+}
+
+function driveAi(roomId: string): void {
+  if (aiDriving.has(roomId)) return;
+  const state = getRoom(roomId);
+  if (!state || state.phase === "ended" || !state.players.some((p) => p.isAI)) return;
+  aiDriving.add(roomId);
+  setTimeout(() => stepAi(roomId, 0), AI_STEP_MS);
 }
 
 // Simple per-socket sliding-window rate limit, so a buggy or hostile client
@@ -222,6 +261,7 @@ io.on("connection", (socket) => {
       const next = applyAction(state, playerId, action as any);
       saveRoom(next);
       broadcastState(roomId);
+      driveAi(roomId); // let any AI seats take their turn(s) next
     } catch (err) {
       socket.emit("errorMessage", err instanceof GameError ? err.message : "Aktion ungültig.");
     }

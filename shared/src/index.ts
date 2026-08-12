@@ -71,6 +71,7 @@ export type { MapGenOptions, GeneratedMap } from "./mapGenerator";
 export { generateMap } from "./mapGenerator";
 
 export { longestRoadLength } from "./longestRoad";
+export { computeAiActions } from "./ai";
 
 export {
   TILE_SIZE,

@@ -72,14 +72,26 @@ export function WaitingRoom({ state, myPlayerId, roomId, sendAction, onLeave }: 
         {state.players.map((p) => (
           <li key={p.id} style={{ borderColor: p.color }}>
             <span className="player-dot" style={{ background: p.color }} />
+            {p.isAI ? "🤖 " : ""}
             {p.name}
             {p.id === myPlayerId && " (du)"}
-            {!p.connected && " · offline"}
+            {!p.connected && !p.isAI && " · offline"}
+            {p.isAI && isHost && (
+              <button className="ai-remove" aria-label={`${p.name} entfernen`} onClick={() => sendAction({ type: "removeAiPlayer", playerId: p.id })}>
+                ✕
+              </button>
+            )}
           </li>
         ))}
       </ul>
 
       <p className="hint">{state.players.length} / 6 Spieler</p>
+
+      {isHost && !state.demoMode && state.players.length < 6 && (
+        <button className="secondary-button" onClick={() => sendAction({ type: "addAiPlayer" })}>
+          🤖 KI-Gegner hinzufügen
+        </button>
+      )}
 
       <div className="room-settings">
         <p className="room-settings-title">Szenario</p>

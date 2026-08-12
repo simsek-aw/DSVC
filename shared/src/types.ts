@@ -87,6 +87,8 @@ export interface Player {
   // one-off strategic effect. It is placed on a vertex where the player already
   // has a settlement or city, so it is visible on the board.
   specialBuildings: SpecialBuildingPlacement[];
+  // A heuristic bot seat (filled by the server), so one person can play solo.
+  isAI?: boolean;
 }
 
 // Optional buildings. Each grants an effect (not victory points), and every
@@ -355,4 +357,6 @@ export type ClientAction =
   | { type: "endTurn" }
   | { type: "restartGame" }
   | { type: "setRoomSettings"; settings: Partial<GameSettings> }
+  | { type: "addAiPlayer" }
+  | { type: "removeAiPlayer"; playerId: string }
   | { type: "buildSpecial"; building: SpecialBuildingId; vertex: VertexId };

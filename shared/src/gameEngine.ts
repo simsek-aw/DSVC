@@ -41,6 +41,8 @@ import {
 
 export const TILE_SIZE = 1;
 
+const AI_NAMES = ["Robo-Rudi", "KI-Klara", "Bot-Bea", "Mecha-Max", "Auto-Anna"];
+
 export class GameError extends Error {}
 
 function emptyResources(): Record<ResourceType, number> {
@@ -1396,6 +1398,39 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       if (state.phase !== "lobby") throw new GameError("Einstellungen nur in der Lobby änderbar.");
       if (state.players[0]?.id !== playerId) throw new GameError("Nur der Host kann die Raum-Einstellungen ändern.");
       return { ...state, settings: { ...state.settings, ...action.settings } };
+    }
+
+    case "addAiPlayer": {
+      if (state.phase !== "lobby") throw new GameError("KI-Gegner nur in der Lobby.");
+      if (state.players[0]?.id !== playerId) throw new GameError("Nur der Host kann KI-Gegner hinzufügen.");
+      if (state.demoMode) throw new GameError("Im Demo-Modus keine KI nötig.");
+      if (state.players.length >= 6) throw new GameError("Raum ist voll (max. 6 Spieler).");
+      const takenNames = new Set(state.players.map((p) => p.name));
+      const name = AI_NAMES.find((n) => !takenNames.has(n)) ?? `KI ${state.players.length}`;
+      const id = `${state.roomId}-ai-${state.players.length}-${Math.floor(Math.random() * 1_000_000)}`;
+      const bot: Player = {
+        id,
+        name,
+        color: PLAYER_COLORS[state.players.length % PLAYER_COLORS.length],
+        connected: true,
+        resources: emptyResources(),
+        developmentCards: [],
+        knightsPlayed: 0,
+        victoryPoints: 0,
+        turnOrderRoll: null,
+        objective: null,
+        specialBuildings: [],
+        isAI: true,
+      };
+      return { ...state, players: [...state.players, bot], log: [...state.log, `🤖 ${name} (KI) ist beigetreten.`] };
+    }
+
+    case "removeAiPlayer": {
+      if (state.phase !== "lobby") throw new GameError("KI-Gegner nur in der Lobby entfernbar.");
+      if (state.players[0]?.id !== playerId) throw new GameError("Nur der Host kann KI-Gegner entfernen.");
+      const bot = state.players.find((p) => p.id === action.playerId);
+      if (!bot || !bot.isAI) throw new GameError("Kein KI-Spieler.");
+      return { ...state, players: state.players.filter((p) => p.id !== action.playerId), log: [...state.log, `🤖 ${bot.name} (KI) wurde entfernt.`] };
     }
 
     case "buildSpecial": {

@@ -2731,3 +2731,17 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* KI-Spieler in der Lobby entfernen. */
+.player-list li { position: relative; }
+.ai-remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #e88; 
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.ai-remove:hover { color: #f44; }

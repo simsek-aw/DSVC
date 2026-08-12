@@ -2686,3 +2686,48 @@ body {
   font-size: 0.9rem;
   text-align: center;
 }
+
+/* Endstand-Auszeichnungen (Superlative aus dem Endstand). */
+.victory-awards {
+  margin: 6px 0 4px;
+}
+
+.victory-awards-title {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #a8dadc;
+  text-align: center;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.award-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.award-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: #10242a;
+  border: 1px solid #24484a;
+}
+
+.award-icon { font-size: 1.3rem; flex-shrink: 0; }
+
+.award-text { display: flex; flex-direction: column; min-width: 0; }
+
+.award-title { font-size: 0.82rem; font-weight: 700; color: #ffd873; }
+
+.award-who {
+  font-size: 0.7rem;
+  color: #bfe0dc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

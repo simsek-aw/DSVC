@@ -914,6 +914,11 @@ function WaterPattern({ view, centerX, centerY }: { view: { scale: number; x: nu
   const transform = `translate(${view.x + centerX}, ${view.y + centerY}) scale(${view.scale / 48})`;
   return (
     <defs>
+      {/* A soft drop shadow lifts settlements, cities and roads off the terrain
+          so they never get lost against a same-toned tile. */}
+      <filter id="piece-shadow" x="-40%" y="-40%" width="180%" height="180%">
+        <feDropShadow dx="0" dy="0.6" stdDeviation="0.8" floodColor="#04120f" floodOpacity="0.55" />
+      </filter>
       {FLAT ? (
         <>
           {/* A clean top-to-bottom sea gradient — no pixel noise. */}
@@ -1046,40 +1051,53 @@ function shade(hex: string, factor: number): string {
  * on a board vertex; no rotation needed.
  */
 function BuildingSprite({ type, cx, cy, size, color }: { type: "settlement" | "city"; cx: number; cy: number; size: number; color: string }) {
-  const dark = shade(color, 0.55);
+  const dark = shade(color, 0.5);
   const roof = shade(color, 0.72);
-  const sw = Math.max(1, size * 0.025);
+  const sw = Math.max(1, size * 0.04); // thicker casing so the piece reads on any terrain
+  const rim = size * 0.03; // light halo width, drawn behind the shape
   if (type === "city") {
     // A squat keep with a battlemented top: reads as "bigger/stronger" even small.
-    const w = size * 0.42;
-    const h = size * 0.26;
+    const w = size * 0.46;
+    const h = size * 0.3;
     const x = cx - w / 2;
     const y = cy - h * 0.4;
     const m = w / 5; // merlon width — three teeth, two gaps
     return (
-      <g stroke={dark} strokeWidth={sw} strokeLinejoin="round">
-        <rect x={x} y={y} width={w} height={h} fill={color} />
-        {/* battlements */}
-        <rect x={x} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
-        <rect x={cx - m / 2} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
-        <rect x={x + w - m} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
-        {/* gate */}
-        <rect x={cx - w * 0.12} y={y + h * 0.35} width={w * 0.24} height={h * 0.65} fill={dark} />
+      <g filter="url(#piece-shadow)" strokeLinejoin="round">
+        {/* Light rim under everything, so the dark casing pops on dark tiles too. */}
+        <rect x={x - rim} y={y - m * 0.7 - rim} width={w + rim * 2} height={h + m * 0.7 + rim * 2} rx={rim} fill="#f5fbff" opacity={0.9} />
+        <g stroke={dark} strokeWidth={sw}>
+          <rect x={x} y={y} width={w} height={h} fill={color} />
+          {/* battlements */}
+          <rect x={x} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
+          <rect x={cx - m / 2} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
+          <rect x={x + w - m} y={y - m * 0.7} width={m} height={m * 0.8} fill={roof} />
+          {/* gate */}
+          <rect x={cx - w * 0.12} y={y + h * 0.35} width={w * 0.24} height={h * 0.65} fill={dark} />
+        </g>
       </g>
     );
   }
   // A plain house: square body the same width as its gable roof, no overhang,
   // so it never reads as an arrow.
-  const w = size * 0.26;
-  const bodyH = size * 0.23;
-  const roofH = size * 0.12;
+  const w = size * 0.3;
+  const bodyH = size * 0.26;
+  const roofH = size * 0.15;
   const x = cx - w / 2;
   const y = cy - bodyH * 0.4;
   return (
-    <g stroke={dark} strokeWidth={sw} strokeLinejoin="round">
-      <rect x={x} y={y} width={w} height={bodyH} fill={color} />
-      <polygon points={`${x - sw},${y + sw} ${cx},${y - roofH} ${x + w + sw},${y + sw}`} fill={shade(color, 0.58)} />
-      <rect x={cx - w * 0.17} y={y + bodyH * 0.42} width={w * 0.34} height={bodyH * 0.58} fill={dark} />
+    <g filter="url(#piece-shadow)" strokeLinejoin="round">
+      {/* Light halo behind the house for contrast on same-toned terrain. */}
+      <polygon
+        points={`${x - rim},${y - rim} ${x - rim},${y + bodyH + rim} ${x + w + rim},${y + bodyH + rim} ${x + w + rim},${y - rim} ${cx},${y - roofH - rim}`}
+        fill="#f5fbff"
+        opacity={0.9}
+      />
+      <g stroke={dark} strokeWidth={sw}>
+        <rect x={x} y={y} width={w} height={bodyH} fill={color} />
+        <polygon points={`${x - sw},${y + sw} ${cx},${y - roofH} ${x + w + sw},${y + sw}`} fill={shade(color, 0.58)} />
+        <rect x={cx - w * 0.17} y={y + bodyH * 0.42} width={w * 0.34} height={bodyH * 0.58} fill={dark} />
+      </g>
     </g>
   );
 }
@@ -1134,13 +1152,16 @@ function SpecialBuildingSprite({ type, cx, cy, size, color }: { type: SpecialBui
 function RoadPlanks({ a, b, size, color }: { a: { x: number; y: number }; b: { x: number; y: number }; size: number; color: string }) {
   const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
   const len = Math.hypot(b.x - a.x, b.y - a.y);
-  const w = Math.max(3, size * 0.11);
+  const w = Math.max(3, size * 0.14); // a touch chunkier so it holds the eye
   const mx = (a.x + b.x) / 2;
   const my = (a.y + b.y) / 2;
-  const dark = shade(color, 0.55);
+  const dark = shade(color, 0.5);
+  const rim = w * 0.22;
   const ties = Math.max(2, Math.round(len / (size * 0.28)));
   return (
-    <g transform={`translate(${mx}, ${my}) rotate(${angle})`}>
+    <g transform={`translate(${mx}, ${my}) rotate(${angle})`} filter="url(#piece-shadow)">
+      {/* Light casing under the plank so the road pops off same-toned terrain. */}
+      <rect x={-len / 2 - rim} y={-w / 2 - rim} width={len + rim * 2} height={w + rim * 2} fill="#f5fbff" opacity={0.9} rx={w * 0.4} />
       <rect x={-len / 2} y={-w / 2} width={len} height={w} fill={dark} rx={w * 0.3} />
       <rect x={-len / 2 + w * 0.15} y={-w / 2 + w * 0.15} width={len - w * 0.3} height={w * 0.7} fill={color} rx={w * 0.2} />
       {Array.from({ length: ties - 1 }, (_, i) => {

@@ -21,7 +21,7 @@ import {
 import { MarkerKind, MarkerSpriteAt, NumberChipAt, ResourceSpriteAt, ShipSpriteAt } from "./PixelIcons";
 import { WaterPatternTile } from "./Water";
 
-export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout" | "lighthouse" | "watchtower";
+export type BuildMode = null | "road" | "settlement" | "city" | "knight" | "bribery" | "roadBuilding" | "scout" | "clairvoyance" | "lighthouse" | "watchtower";
 
 interface Props {
   state: GameState;
@@ -316,7 +316,8 @@ export function HexBoard({
 
   // While a tap is supposed to place the robber or aim a card, taps must reach
   // the tile itself — explaining things would swallow them.
-  const aiming = awaitingRobberMove || buildMode === "knight" || buildMode === "bribery" || buildMode === "scout";
+  const aiming =
+    awaitingRobberMove || buildMode === "knight" || buildMode === "bribery" || buildMode === "scout" || buildMode === "clairvoyance";
   const inspect = aiming ? undefined : onInspect;
 
   const handleTileClick = (tile: Tile) => {
@@ -330,6 +331,9 @@ export function HexBoard({
       onAimResolved?.();
     } else if (buildMode === "scout" && !tile.revealed) {
       sendAction({ type: "scoutTile", coord: tile.coord });
+      onAimResolved?.();
+    } else if (buildMode === "clairvoyance" && !tile.revealed) {
+      sendAction({ type: "playClairvoyance", coord: tile.coord });
       onAimResolved?.();
     }
   };

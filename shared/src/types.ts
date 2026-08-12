@@ -58,7 +58,7 @@ export interface Road {
 // Bought with ore+wheat+sheep, played from hand. "bribery" is the direct answer to the
 // classic robber's 7-roll blocking: it's a deliberate, targetable action fully decoupled
 // from dice rolls, so it can't be undone by the next 7.
-export type DevelopmentCardType = "knight" | "roadBuilding" | "invention" | "monopoly" | "bribery";
+export type DevelopmentCardType = "knight" | "roadBuilding" | "invention" | "monopoly" | "bribery" | "clairvoyance";
 
 export interface Player {
   id: string;
@@ -322,6 +322,7 @@ export type ClientAction =
   | { type: "playInvention"; resources: [ResourceType, ResourceType] }
   | { type: "playMonopoly"; resource: ResourceType }
   | { type: "playBribery"; coord: AxialCoord }
+  | { type: "playClairvoyance"; coord: AxialCoord }
   | { type: "bankTrade"; give: ResourceType; receive: ResourceType }
   | { type: "offerTrade"; toPlayerId: string; give: Partial<Record<ResourceType, number>>; receive: Partial<Record<ResourceType, number>> }
   | { type: "respondTrade"; accept: boolean }

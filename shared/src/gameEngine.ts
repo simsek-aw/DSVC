@@ -65,6 +65,7 @@ function buildDevelopmentDeck(): DevelopmentCardType[] {
     ["invention", 3],
     ["monopoly", 3],
     ["bribery", 3],
+    ["clairvoyance", 3],
   ];
   const deck: DevelopmentCardType[] = [];
   for (const [type, count] of composition) for (let i = 0; i < count; i++) deck.push(type);
@@ -1017,6 +1018,24 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
         briberyBeneficiaryId: playerId,
         log: [...next.log, `💰 ${currentPlayer(next).name} besticht den Räuber — die Ernte eines ${TERRAIN_NAMES_DE[target.terrain]}-Felds wandert nun zu ihm.`],
       };
+      return next;
+    }
+
+    case "playClairvoyance": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      const target = findTile(state, action.coord);
+      if (target.revealed) throw new GameError("Dieses Feld ist bereits aufgedeckt.");
+      let next = updatePlayer(state, playerId, (p) => removeOneCard(p, "clairvoyance"));
+      // Publicly uncover the chosen hidden tile for everyone, and let the seer
+      // claim any treasure that was buried under it — a themed exploration card.
+      next = {
+        ...next,
+        tiles: next.tiles.map((t) => (axialKey(t.coord) === axialKey(target.coord) ? { ...t, revealed: true, scoutedBy: [] } : t)),
+        log: [...next.log, `🔮 ${currentPlayer(next).name} deckt mit einer Späh-Karte ein verdecktes Feld auf.`],
+      };
+      const revealed = findTile(next, action.coord);
+      if (revealed.treasure) next = collectTreasure(next, revealed, playerId);
       return next;
     }
 

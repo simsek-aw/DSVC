@@ -159,6 +159,7 @@ const CARD_LABELS: Record<DevelopmentCardType, string> = {
   invention: "💡 Erfindung",
   monopoly: "📈 Monopol",
   bribery: "💰 Bestechung",
+  clairvoyance: "🔮 Späh-Karte",
 };
 
 export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
@@ -1041,6 +1042,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
           <div className="mode-hint">Wähle ein verdecktes Nachbarfeld — nur du siehst, was dort liegt</div>
         )}
         {buildMode === "bribery" && <div className="mode-hint">Wähle ein aufgedecktes Feld für die Bestechung</div>}
+        {buildMode === "clairvoyance" && <div className="mode-hint">Wähle ein verdecktes Feld — es wird für alle aufgedeckt</div>}
         {buildMode === "lighthouse" && (
           <div className="mode-hint">Wähle eine eigene Siedlung/Stadt an der Küste für den Leuchtturm</div>
         )}
@@ -1237,7 +1239,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         {showCards && me && (
           <div className="card-panel">
             {me.developmentCards.length === 0 && <p className="hint">Keine Karten auf der Hand.</p>}
-            {(["knight", "roadBuilding", "invention", "monopoly", "bribery"] as DevelopmentCardType[]).map((type) => {
+            {(["knight", "roadBuilding", "invention", "monopoly", "bribery", "clairvoyance"] as DevelopmentCardType[]).map((type) => {
               const count = me.developmentCards.filter((c) => c === type).length;
               if (count === 0) return null;
               return (
@@ -1259,6 +1261,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                     </button>
                   )}
                   {type === "bribery" && <button onClick={() => setBuildMode("bribery")}>Spielen</button>}
+                  {type === "clairvoyance" && <button onClick={() => { setShowCards(false); setBuildMode("clairvoyance"); }}>Spielen</button>}
                   {type === "invention" && (
                     <div className="inline-picker">
                       <select value={inventionPicks[0]} onChange={(e) => setInventionPicks([e.target.value as ResourceType, inventionPicks[1]])}>

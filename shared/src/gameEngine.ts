@@ -66,6 +66,8 @@ function buildDevelopmentDeck(): DevelopmentCardType[] {
     ["monopoly", 3],
     ["bribery", 3],
     ["clairvoyance", 3],
+    ["treasureHunt", 2],
+    ["storm", 2],
   ];
   const deck: DevelopmentCardType[] = [];
   for (const [type, count] of composition) for (let i = 0; i < count; i++) deck.push(type);
@@ -1036,6 +1038,42 @@ function reduce(state: GameState, playerId: string, action: ClientAction): GameS
       };
       const revealed = findTile(next, action.coord);
       if (revealed.treasure) next = collectTreasure(next, revealed, playerId);
+      return next;
+    }
+
+    case "playTreasureHunt": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      let next = updatePlayer(state, playerId, (p) => removeOneCard(p, "treasureHunt"));
+      const name = currentPlayer(next).name;
+      // Dig the ruins: mostly a cache of resources, sometimes a relic (dev card),
+      // occasionally a dud. Uses the same randomness source as the rest of setup.
+      const roll = Math.random();
+      if (roll < 0.3 && next.developmentDeck.length > 0) {
+        const [card, ...rest] = next.developmentDeck;
+        next = updatePlayer({ ...next, developmentDeck: rest }, playerId, (p) => ({ ...p, developmentCards: [...p.developmentCards, card] }));
+        next = { ...next, log: [...next.log, `🏺 ${name} birgt bei der Schatzsuche ein Relikt (Entwicklungskarte).`] };
+      } else if (roll < 0.9) {
+        const resource = RESOURCE_TYPES[Math.floor(Math.random() * RESOURCE_TYPES.length)];
+        next = updatePlayer(next, playerId, (p) => ({ ...p, resources: { ...p.resources, [resource]: p.resources[resource] + 2 } }));
+        next = { ...next, log: [...next.log, `📦 ${name} hebt bei der Schatzsuche 2× ${TERRAIN_NAMES_DE[resource]}.`] };
+      } else {
+        next = { ...next, log: [...next.log, `🕳️ ${name} durchsucht eine Ruine — leider leer.`] };
+      }
+      return next;
+    }
+
+    case "playStorm": {
+      if (state.phase !== "mainGame") throw new GameError("Nicht in der Hauptspielphase.");
+      requireCurrentPlayer(state, playerId);
+      let next = updatePlayer(state, playerId, (p) => removeOneCard(p, "storm"));
+      // Conjure a storm for the round: harbours shut (bank falls back to 4:1)
+      // until the next event-round clears the weather again.
+      next = {
+        ...next,
+        weather: { kind: "storm" },
+        log: [...next.log, `🌩️ ${currentPlayer(next).name} beschwört einen Sturm — die Häfen bleiben diese Runde geschlossen.`],
+      };
       return next;
     }
 

@@ -160,6 +160,8 @@ const CARD_LABELS: Record<DevelopmentCardType, string> = {
   monopoly: "📈 Monopol",
   bribery: "💰 Bestechung",
   clairvoyance: "🔮 Späh-Karte",
+  treasureHunt: "🏺 Schatzsuche",
+  storm: "🌩️ Sturm",
 };
 
 export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
@@ -1239,7 +1241,7 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
         {showCards && me && (
           <div className="card-panel">
             {me.developmentCards.length === 0 && <p className="hint">Keine Karten auf der Hand.</p>}
-            {(["knight", "roadBuilding", "invention", "monopoly", "bribery", "clairvoyance"] as DevelopmentCardType[]).map((type) => {
+            {(["knight", "roadBuilding", "invention", "monopoly", "bribery", "clairvoyance", "treasureHunt", "storm"] as DevelopmentCardType[]).map((type) => {
               const count = me.developmentCards.filter((c) => c === type).length;
               if (count === 0) return null;
               return (
@@ -1262,6 +1264,8 @@ export function GameView({ state, myPlayerId, sendAction, onLeave }: Props) {
                   )}
                   {type === "bribery" && <button onClick={() => setBuildMode("bribery")}>Spielen</button>}
                   {type === "clairvoyance" && <button onClick={() => { setShowCards(false); setBuildMode("clairvoyance"); }}>Spielen</button>}
+                  {type === "treasureHunt" && <button onClick={() => sendAction({ type: "playTreasureHunt" })}>Spielen</button>}
+                  {type === "storm" && <button onClick={() => sendAction({ type: "playStorm" })}>Spielen</button>}
                   {type === "invention" && (
                     <div className="inline-picker">
                       <select value={inventionPicks[0]} onChange={(e) => setInventionPicks([e.target.value as ResourceType, inventionPicks[1]])}>
